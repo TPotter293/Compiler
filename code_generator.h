@@ -1,23 +1,23 @@
 #ifndef CODE_GENERATOR_H
 #define CODE_GENERATOR_H
 
-#include "AST.h"
 #include <stdio.h>
 
-void generateCode(ASTNode* root, FILE* output_file);
-void generateProgramCode(ASTNode* node, FILE* output_file);
-void generateStatementsCode(ASTNode* node, FILE* output_file);
-void generateStatementCode(ASTNode* node, FILE* output_file);
-void generateDeclarationCode(ASTNode* node, FILE* output_file);
-void generateAssignmentCode(ASTNode* node, FILE* output_file);
-void generateWriteCode(ASTNode* node, FILE* output_file);
-void generateIfCode(ASTNode* node, FILE* output_file);
-void generateReturnCode(ASTNode* node, FILE* output_file);
-void generateExpressionCode(ASTNode* node, FILE* output_file);
-void generateBinaryOpCode(ASTNode* node, FILE* output_file);
-void generateUnaryOpCode(ASTNode* node, FILE* output_file);
+typedef struct {
+    char result[10];
+    char arg1[10];
+    char op[4];
+    char arg2[10];
+} TACInstruction;
 
-void initializeCodeGenSymbolTable();
+void generateCode(const char* tac_filename, FILE* output_file);
+void readTACFile(const char* filename);
+void generateTACCode(FILE* output_file);
+void generateAssignmentCode(TACInstruction* instr, FILE* output_file);
+void generateWriteCode(const char* arg, FILE* output_file);
+void generateBinaryOpCode(TACInstruction* instr, FILE* output_file);
+
+int is_number_cg(const char* str);
 void allocateVariable(const char* identifier);
 int getVariableLocation(const char* identifier);
 void freeCodeGenSymbolTable();
