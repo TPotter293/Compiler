@@ -14,8 +14,6 @@ int words = 0;
 int chars = 0;
 int lines = 0;
 
-void cleanup();
-
 %}
 
 %option noyywrap
@@ -47,20 +45,20 @@ ws          {delim}+
 %{
 	// Recognize keywords and types	
 %}
-"int"        { words++; chars += (yytext ? strlen(yytext) : 0);
+"int"        { words++; chars += strlen(yytext);
                 printf("%s : TYPE\n", yytext);
                 yylval.strval = strdup(yytext);
                 return TYPE;
               }
 
-"char"       { words++; chars += (yytext ? strlen(yytext) : 0);
+"char"       { words++; chars += strlen(yytext);
                 printf("%s : TYPE\n", yytext);
                 yylval.strval = strdup(yytext);
                 return TYPE;
               }
 
 "write"      { words++;
-                chars += (yytext ? strlen(yytext) : 0);
+                chars += strlen(yytext);
                 printf("%s : KEYWORD\n", yytext);
                 yylval.strval = strdup(yytext);
                 return WRITE;
@@ -69,19 +67,19 @@ ws          {delim}+
 %{
 	// Control flow keywords
 %}
-"if"         { words++; chars += (yytext ? strlen(yytext) : 0);
+"if"         { words++; chars += strlen(yytext);
                 printf("%s : IF\n", yytext);
                 yylval.strval = strdup(yytext);
                 return IF;
               }
 
-"else"       { words++; chars += (yytext ? strlen(yytext) : 0);
+"else"       { words++; chars += strlen(yytext);
                 printf("%s : ELSE\n", yytext);
                 yylval.strval = strdup(yytext);
                 return ELSE;
               }
 
-"return"     { words++; chars += (yytext ? strlen(yytext) : 0);
+"return"     { words++; chars += strlen(yytext);
                 printf("%s : RETURN\n", yytext);
                 yylval.strval = strdup(yytext);
                 return RETURN;
@@ -90,7 +88,7 @@ ws          {delim}+
 %{
 	// Recognize identifiers
 %}
-{ID}         { words++; chars += (yytext ? strlen(yytext) : 0);
+{ID}         { words++; chars += strlen(yytext);
                 printf("%s : IDENTIFIER\n", yytext);
                 yylval.strval = strdup(yytext);
                 return IDENTIFIER;
@@ -99,7 +97,7 @@ ws          {delim}+
 %{
 	// Recognize numbers
 %}
-{NUMBER}     { words++; chars += (yytext ? strlen(yytext) : 0);
+{NUMBER}     { words++; chars += strlen(yytext);
                 printf("%s : NUMBER\n", yytext);
                 yylval.intval = atof(yytext);  // Convert to float or int as needed
                 return NUMBER;
@@ -203,10 +201,3 @@ ws          {delim}+
               }
 %%
 
-void cleanup() {
-    // Free any dynamic memory allocated for yylval.strval
-    if (yylval.strval != NULL) {
-        free(yylval.strval);
-        yylval.strval = NULL;  // Set to NULL to avoid dangling pointer
-    }
-}

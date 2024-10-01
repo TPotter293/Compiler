@@ -1,5 +1,4 @@
 %{
-#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,9 +7,6 @@
 #include "AST.h"
 #include "optimizer.h"
 #include "code_generator.h"
-
-clock_t start, end;
-double cpu_time_used;
 
 extern int yylex();
 extern int yyparse();
@@ -216,8 +212,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    start = clock();
-
     printf("Starting parser...\n");
     yyparse();
     printf("Parsing completed.\n");
@@ -241,16 +235,11 @@ if (output_file == NULL) {
     fprintf(stderr, "Error opening output file\n");
     return 1;
 }
-    generateCode(root, output_file);
+    generateCode("optimized.tac", output_file);
 
     fclose(output_file);
 
     // Print or traverse the AST here if needed
     clean_up_symbol_table();
-
-    // compute execution time
-    end = clock();
-    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("STATS: execution time of %f\n", cpu_time_used);
     return 0;
 }

@@ -1,10 +1,9 @@
 #include "code_generator.h"
-#include "AST.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define MAX_VARIABLES 100
+#define MAX_TAC_INSTRUCTIONS 1000
 
 struct {
     char* name;
@@ -12,182 +11,126 @@ struct {
 } variables[MAX_VARIABLES];
 int variable_count = 0;
 
-void generateCode(ASTNode* root, FILE* output_file) {
+TACInstruction tac_instructions[MAX_TAC_INSTRUCTIONS];
+int tac_instruction_count = 0;
+
+void generateCode(const char* tac_filename, FILE* output_file) {
     printf("DEBUG: Entering generateCode\n");
     fprintf(output_file, ".data\n");
     fprintf(output_file, "newline: .asciiz \"\\n\"\n");
     fprintf(output_file, ".text\n");
     fprintf(output_file, ".globl main\n");
     fprintf(output_file, "main:\n");
-    generateProgramCode(root, output_file);
+
+    readTACFile(tac_filename);
+    generateTACCode(output_file);
+
     fprintf(output_file, "li $v0, 10\n");
     fprintf(output_file, "syscall\n");
     printf("DEBUG: Exiting generateCode\n");
 }
 
-void generateProgramCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateProgramCode\n");
-    generateStatementsCode(node, output_file);
-    printf("DEBUG: Exiting generateProgramCode\n");
-}
-
-void generateStatementsCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateStatementsCode\n");
-    for (int i = 0; i < node->statements.count; i++) {
-        printf("DEBUG: Processing statement %d of %d\n", i+1, node->statements.count);
-        generateStatementCode(node->statements.stmts[i], output_file);
-    }
-    printf("DEBUG: Exiting generateStatementsCode\n");
-}
-
-void generateStatementCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateStatementCode for node type %d\n", node->type);
-    switch (node->type) {
-        case NODE_TYPE_DECLARATION:
-            generateDeclarationCode(node, output_file);
-            break;
-        case NODE_TYPE_ASSIGNMENT:
-            generateAssignmentCode(node, output_file);
-            break;
-        case NODE_TYPE_WRITE:
-            generateWriteCode(node, output_file);
-            break;
-        case NODE_TYPE_IF:
-            generateIfCode(node, output_file);
-            break;
-        case NODE_TYPE_RETURN:
-            generateReturnCode(node, output_file);
-            break;
-        default:
-            fprintf(stderr, "Unknown statement type in code generation\n");
-            exit(1);
-    }
-    printf("DEBUG: Exiting generateStatementCode\n");
-}
-
-void generateDeclarationCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateDeclarationCode\n");
-    if (node->right && node->right->id) {
-        allocateVariable(node->right->id);
-    } else {
-        fprintf(stderr, "Error: Invalid declaration node structure\n");
+void readTACFile(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Error opening TAC file\n");
         exit(1);
     }
-    printf("DEBUG: Exiting generateDeclarationCode\n");
+
+    char line[100];
+    while (fgets(line, sizeof(line), file) && tac_instruction_count < MAX_TAC_INSTRUCTIONS) {
+        TACInstruction* instr = &tac_instructions[tac_instruction_count];
+        if (sscanf(line, "%s = %s %s %s", instr->result, instr->arg1, instr->op, instr->arg2) == 4) {
+            tac_instruction_count++;
+        } else if (sscanf(line, "%s = %s", instr->result, instr->arg1) == 2) {
+            instr->op[0] = '\0';
+            instr->arg2[0] = '\0';
+            tac_instruction_count++;
+        } else if (sscanf(line, "print %s", instr->arg1) == 1) {
+            strcpy(instr->result, "print");
+            instr->op[0] = '\0';
+            instr->arg2[0] = '\0';
+            tac_instruction_count++;
+        }
+    }
+
+    fclose(file);
 }
 
-void generateAssignmentCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateAssignmentCode\n");
-    generateExpressionCode(node->right, output_file);
-    int offset = getVariableLocation(node->left->id);
+void generateTACCode(FILE* output_file) {
+    for (int i = 0; i < tac_instruction_count; i++) {
+        TACInstruction* instr = &tac_instructions[i];
+        if (strcmp(instr->result, "print") == 0) {
+            generateWriteCode(instr->arg1, output_file);
+        } else if (instr->op[0] != '\0') {
+            generateBinaryOpCode(instr, output_file);
+        } else {
+            generateAssignmentCode(instr, output_file);
+        }
+    }
+}
+
+void generateAssignmentCode(TACInstruction* instr, FILE* output_file) {
+    if (is_number_cg(instr->arg1)) {
+        fprintf(output_file, "li $t0, %s\n", instr->arg1);
+    } else {
+        int offset = getVariableLocation(instr->arg1);
+        fprintf(output_file, "lw $t0, %d($sp)\n", offset);
+    }
+    int offset = getVariableLocation(instr->result);
     fprintf(output_file, "sw $t0, %d($sp)\n", offset);
-    printf("DEBUG: Exiting generateAssignmentCode\n");
 }
 
-void generateWriteCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateWriteCode\n");
-    generateExpressionCode(node->left, output_file);
-    fprintf(output_file, "move $a0, $t0\n");
+void generateWriteCode(const char* arg, FILE* output_file) {
+    if (is_number_cg(arg)) {
+        fprintf(output_file, "li $a0, %s\n", arg);
+    } else {
+        int offset = getVariableLocation(arg);
+        fprintf(output_file, "lw $a0, %d($sp)\n", offset);
+    }
     fprintf(output_file, "li $v0, 1\n");
     fprintf(output_file, "syscall\n");
     fprintf(output_file, "la $a0, newline\n");
     fprintf(output_file, "li $v0, 4\n");
     fprintf(output_file, "syscall\n");
-    printf("DEBUG: Exiting generateWriteCode\n");
 }
 
-void generateIfCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateIfCode\n");
-    static int label_count = 0;
-    int current_label = label_count++;
-    
-    generateExpressionCode(node->left, output_file);
-    fprintf(output_file, "beqz $t0, else_%d\n", current_label);
-    generateStatementsCode(node->right, output_file);
-    fprintf(output_file, "j endif_%d\n", current_label);
-    fprintf(output_file, "else_%d:\n", current_label);
-    if (node->statements.count > 0) {
-        generateStatementsCode(node->statements.stmts[0], output_file);
+void generateBinaryOpCode(TACInstruction* instr, FILE* output_file) {
+    if (is_number_cg(instr->arg1)) {
+        fprintf(output_file, "li $t1, %s\n", instr->arg1);
+    } else {
+        int offset = getVariableLocation(instr->arg1);
+        fprintf(output_file, "lw $t1, %d($sp)\n", offset);
     }
-    fprintf(output_file, "endif_%d:\n", current_label);
-    printf("DEBUG: Exiting generateIfCode\n");
-}
 
-void generateReturnCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateReturnCode\n");
-    generateExpressionCode(node->left, output_file);
-    fprintf(output_file, "move $v0, $t0\n");
-    fprintf(output_file, "jr $ra\n");
-    printf("DEBUG: Exiting generateReturnCode\n");
-}
-
-void generateExpressionCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateExpressionCode for node type %d\n", node->type);
-    switch (node->type) {
-        case NODE_TYPE_NUMBER:
-            fprintf(output_file, "li $t0, %d\n", node->value);
-            break;
-        case NODE_TYPE_IDENTIFIER:
-            {
-                int offset = getVariableLocation(node->id);
-                fprintf(output_file, "lw $t0, %d($sp)\n", offset);
-            }
-            break;
-        case NODE_TYPE_BINARY_OP:
-            generateBinaryOpCode(node, output_file);
-            break;
-        case NODE_TYPE_UNARY_OP:
-            generateUnaryOpCode(node, output_file);
-            break;
-        default:
-            fprintf(stderr, "Unknown expression type in code generation\n");
-            exit(1);
+    if (is_number_cg(instr->arg2)) {
+        fprintf(output_file, "li $t2, %s\n", instr->arg2);
+    } else {
+        int offset = getVariableLocation(instr->arg2);
+        fprintf(output_file, "lw $t2, %d($sp)\n", offset);
     }
-    printf("DEBUG: Exiting generateExpressionCode\n");
-}
 
-void generateBinaryOpCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateBinaryOpCode\n");
-    generateExpressionCode(node->left, output_file);
-    fprintf(output_file, "move $t1, $t0\n");
-    generateExpressionCode(node->right, output_file);
-    fprintf(output_file, "move $t2, $t0\n");
-
-    switch (node->op[0]) {
-        case '+':
-            fprintf(output_file, "add $t0, $t1, $t2\n");
-            break;
-        case '-':
-            fprintf(output_file, "sub $t0, $t1, $t2\n");
-            break;
-        case '*':
-            fprintf(output_file, "mul $t0, $t1, $t2\n");
-            break;
-        case '/':
-            fprintf(output_file, "div $t0, $t1, $t2\n");
-            break;
-        default:
-            fprintf(stderr, "Unknown binary operator in code generation\n");
-            exit(1);
+    if (strcmp(instr->op, "+") == 0) {
+        fprintf(output_file, "add $t0, $t1, $t2\n");
+    } else if (strcmp(instr->op, "-") == 0) {
+        fprintf(output_file, "sub $t0, $t1, $t2\n");
+    } else if (strcmp(instr->op, "*") == 0) {
+        fprintf(output_file, "mul $t0, $t1, $t2\n");
+    } else if (strcmp(instr->op, "/") == 0) {
+        fprintf(output_file, "div $t0, $t1, $t2\n");
     }
-    printf("DEBUG: Exiting generateBinaryOpCode\n");
+
+    int offset = getVariableLocation(instr->result);
+    fprintf(output_file, "sw $t0, %d($sp)\n", offset);
 }
 
-void generateUnaryOpCode(ASTNode* node, FILE* output_file) {
-    printf("DEBUG: Entering generateUnaryOpCode\n");
-    generateExpressionCode(node->left, output_file);
-    fprintf(output_file, "not $t0, $t0\n");
-    printf("DEBUG: Exiting generateUnaryOpCode\n");
-}
-
-void initializeCodeGenSymbolTable() {
-    printf("DEBUG: Entering initializeCodeGenSymbolTable\n");
-    variable_count = 0;
-    printf("DEBUG: Exiting initializeCodeGenSymbolTable\n");
+int is_number_cg(const char* str) {
+    char* endptr;
+    strtol(str, &endptr, 10);
+    return *endptr == '\0';
 }
 
 void allocateVariable(const char* identifier) {
-    printf("DEBUG: Entering allocateVariable for %s\n", identifier);
     if (variable_count >= MAX_VARIABLES) {
         fprintf(stderr, "Too many variables\n");
         exit(1);
@@ -195,26 +138,21 @@ void allocateVariable(const char* identifier) {
     variables[variable_count].name = strdup(identifier);
     variables[variable_count].offset = -4 * (variable_count + 1);
     variable_count++;
-    printf("DEBUG: Exiting allocateVariable\n");
 }
 
 int getVariableLocation(const char* identifier) {
-    printf("DEBUG: Entering getVariableLocation for %s\n", identifier);
     for (int i = 0; i < variable_count; i++) {
         if (strcmp(variables[i].name, identifier) == 0) {
-            printf("DEBUG: Exiting getVariableLocation, found at offset %d\n", variables[i].offset);
             return variables[i].offset;
         }
     }
-    fprintf(stderr, "Undefined variable: %s\n", identifier);
-    exit(1);
+    allocateVariable(identifier);
+    return variables[variable_count - 1].offset;
 }
 
 void freeCodeGenSymbolTable() {
-    printf("DEBUG: Entering freeCodeGenSymbolTable\n");
     for (int i = 0; i < variable_count; i++) {
         free(variables[i].name);
     }
     variable_count = 0;
-    printf("DEBUG: Exiting freeCodeGenSymbolTable\n");
 }
