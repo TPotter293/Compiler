@@ -147,12 +147,17 @@ void analyzeDeclaration(ASTNode* node) {
 }
 
 void analyzeAssignment(ASTNode* node) {
-    analyzeNode(node->right);
-    
+    analyzeNode(node->right);  // Analyze the right-hand side to get temp_var_name
+
     char tac_line[100];
     sprintf(tac_line, "%s = %s", node->left->id, node->right->temp_var_name);
     generateTACLine(tac_line);
+
+    node->left->temp_var_name = node->right->temp_var_name;  // Assign temp_var_name to the left-hand side
+    updateIdToTemp(node->left->id, getIdIndex(node->right->temp_var_name));
+
 }
+
 
 void analyzeWrite(ASTNode* node) {
     analyzeNode(node->left);
@@ -174,10 +179,23 @@ void analyzeBinaryOp(ASTNode* node) {
     generateTACLine(tac_line);
 
     node->temp_var_name = temp;
+
+    int temp_var_index = getIdIndex(temp);
+    updateIdToTemp(temp, temp_var_index);
+}
+
+
+    node->temp_var_name = temp;
 }
 void analyzeIdentifier(ASTNode* node) {
-    // Skip TAC generation for identifiers
+    int index = getIdIndex(node->id);
+    if (index != -1) {
+        node->temp_var_name = id_to_temp[index].name;
+    } else {
+        fprintf(stderr, "Error: Identifier %s not found in temp variable mapping.\n", node->id);
+    }
 }
+
 
 void analyzeNode(ASTNode* node) {
     if (node == NULL) {
@@ -210,6 +228,10 @@ void analyzeNode(ASTNode* node) {
                 sprintf(tac_line, "%s = %d", temp, node->value);
                 generateTACLine(tac_line);
                 node->temp_var_name = temp;
+
+                int temp_var_index = getIdIndex(temp);
+                updateIdToTemp(temp, temp_var_index);
+
             }
             break;
         default:
