@@ -131,15 +131,21 @@ void copy_propagation(TACInstruction* instructions, int* num_instructions) {
                 if (strcmp(instructions[j].arg1, instructions[i].result) == 0) {
                     strcpy(instructions[j].arg1, instructions[i].arg1);
                     instructions[j].is_optimized = 1;
+                    printf("Propagated: %s to %s\n", instructions[i].arg1, instructions[j].result);
                 }
                 if (strcmp(instructions[j].arg2, instructions[i].result) == 0) {
                     strcpy(instructions[j].arg2, instructions[i].arg1);
                     instructions[j].is_optimized = 1;
+                    printf("Propagated: %s to %s\n", instructions[i].arg1, instructions[j].result);
+                }
+                if (strcmp(instructions[j].result, instructions[i].result) == 0) {
+                    break;  // Stop propagation if the variable is reassigned
                 }
             }
         }
     }
 }
+
 
 void dead_code_elimination(TACInstruction* instructions, int* num_instructions) {
     int used_instructions[MAX_INSTRUCTIONS] = {0};
@@ -198,21 +204,35 @@ void optimize_TAC(const char* input_filename, const char* output_filename) {
         return;
     }
 
+    printf("Initial TAC:\n");
+    print_instructions(instructions, num_instructions);
+
     constant_folding(instructions, &num_instructions);
+    printf("After constant folding:\n");
+    print_instructions(instructions, num_instructions);
+
     algebraic_simplification(instructions, &num_instructions);
+    printf("After algebraic simplification:\n");
+    print_instructions(instructions, num_instructions);
+
     copy_propagation(instructions, &num_instructions);
-    
+    printf("After copy propagation:\n");
+    print_instructions(instructions, num_instructions);
+
     // Mark print instructions as preserved
     for (int i = 0; i < num_instructions; i++) {
         if (strcmp(instructions[i].result, "print") == 0) {
             instructions[i].is_preserved = 1;
         }
     }
-    
+
     dead_code_elimination(instructions, &num_instructions);
+    printf("After dead code elimination:\n");
+    print_instructions(instructions, num_instructions);
 
     write_TAC(output_filename, instructions, num_instructions);
 }
+
 
 
 void print_instructions(TACInstruction* instructions, int num_instructions) {
