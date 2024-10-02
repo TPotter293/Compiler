@@ -109,6 +109,8 @@ void generateTAC(ASTNode* node) {
     }
 }
 
+
+
 void updateIdToTemp(const char* id, int temp_var) {
     for (int i = 0; i < id_to_temp_count; i++) {
         if (strcmp(id_to_temp[i].name, id) == 0) {
@@ -153,6 +155,7 @@ void analyzeAssignment(ASTNode* node) {
 
     node->left->temp_var_name = node->right->temp_var_name;  // Assign temp_var_name to the left-hand side
     updateIdToTemp(node->left->id, getIdIndex(node->right->temp_var_name));
+
 }
 
 
@@ -181,6 +184,9 @@ void analyzeBinaryOp(ASTNode* node) {
     updateIdToTemp(temp, temp_var_index);
 }
 
+
+    node->temp_var_name = temp;
+}
 void analyzeIdentifier(ASTNode* node) {
     int index = getIdIndex(node->id);
     if (index != -1) {
@@ -225,6 +231,7 @@ void analyzeNode(ASTNode* node) {
 
                 int temp_var_index = getIdIndex(temp);
                 updateIdToTemp(temp, temp_var_index);
+
             }
             break;
         default:
