@@ -186,6 +186,7 @@ void analyzeBinaryOp(ASTNode* node) {
 
     int temp_var_index = getIdIndex(temp);
     updateIdToTemp(temp, temp_var_index);
+
 }
 
 
@@ -194,6 +195,7 @@ void analyzeIdentifier(ASTNode* node) {
     if (index != -1) {
         node->temp_var_name = id_to_temp[index].name;
     } else {
+
         // Initialize uninitialized variables with a default value (e.g., 0)
         char* temp = newTemp();
         char tac_line[100];
@@ -204,6 +206,7 @@ void analyzeIdentifier(ASTNode* node) {
         fprintf(stderr, "Warning: Initializing uninitialized variable %s to 0\n", node->id);
     }
 }
+
 
 
 
