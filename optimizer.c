@@ -76,42 +76,20 @@ int evaluate_constant_expression(int value1, int value2, const char* op) {
 
 void constant_folding(TACInstruction* instructions, int* num_instructions) {
     for (int i = 0; i < *num_instructions; i++) {
-        // Check if the operation is valid
         if (instructions[i].op[0] != '\0') {
-            int arg1_val = 0, arg2_val = 0;
-            int arg1_is_const = is_number(instructions[i].arg1);
-            int arg2_is_const = is_number(instructions[i].arg2);
-            int temp_index;
-
-            // Evaluate arg1
-            if (arg1_is_const) {
-                arg1_val = atoi(instructions[i].arg1);
-            } else if (sscanf(instructions[i].arg1, "t%d", &temp_index) == 1) {
-                arg1_val = atoi(instructions[temp_index].arg1);
-            }
-
-            // Evaluate arg2
-            if (arg2_is_const) {
-                arg2_val = atoi(instructions[i].arg2);
-            } else if (sscanf(instructions[i].arg2, "t%d", &temp_index) == 1) {
-                arg2_val = atoi(instructions[temp_index].arg1);
-            }
-
-            // Perform constant folding only if both args are constants
-            if (arg1_is_const && arg2_is_const) {
-                int folded_value = evaluate_constant_expression(arg1_val, arg2_val, instructions[i].op);
-                
-                // Update the instruction with the folded value
-                snprintf(instructions[i].arg1, sizeof(instructions[i].arg1), "%d", folded_value);
-                instructions[i].op[0] = '\0'; // Clear the operation
-                instructions[i].arg2[0] = '\0'; // Clear the second argument
-
-                // Print the folded instruction for debugging
-                printf("Folded instruction: %s = %d\n", instructions[i].result, folded_value);
+            int arg1_val, arg2_val;
+            if (sscanf(instructions[i].arg1, "%d", &arg1_val) == 1 &&
+                sscanf(instructions[i].arg2, "%d", &arg2_val) == 1) {
+                int result = evaluate_constant_expression(arg1_val, arg2_val, instructions[i].op);
+                sprintf(instructions[i].arg1, "%d", result);
+                instructions[i].op[0] = '\0';
+                instructions[i].arg2[0] = '\0';
+                instructions[i].is_optimized = 1;
             }
         }
     }
 }
+
 
 
 
@@ -168,9 +146,11 @@ void dead_code_elimination(TACInstruction* instructions, int* num_instructions) 
 
     // Track dependencies
     for (int i = 0; i < *num_instructions; i++) {
-        if (!instructions[i].is_dead && !instructions[i].is_preserved) { // Skip preserved instructions
+        if (!instructions[i].is_dead && !instructions[i].is_preserved) {
             for (int j = i + 1; j < *num_instructions; j++) {
-                if (strcmp(instructions[j].arg1, instructions[i].result) == 0 || strcmp(instructions[j].arg2, instructions[i].result) == 0) {
+                if (strcmp(instructions[j].arg1, instructions[i].result) == 0 || 
+                    strcmp(instructions[j].arg2, instructions[i].result) == 0 ||
+                    (strcmp(instructions[j].result, "print") == 0 && strcmp(instructions[j].arg1, instructions[i].result) == 0)) {
                     used_instructions[i] = 1;
                     break;
                 }
@@ -180,13 +160,13 @@ void dead_code_elimination(TACInstruction* instructions, int* num_instructions) 
 
     // Mark instructions as dead if not used and not preserved
     for (int i = 0; i < *num_instructions; i++) {
-        if (!used_instructions[i] && strcmp(instructions[i].result, "print") != 0 && !instructions[i].is_preserved) {
+        if (!used_instructions[i] && !instructions[i].is_preserved) {
             instructions[i].is_dead = 1;
             instructions[i].is_optimized = 1;
-            printf("Eliminated dead code: %s = %s %s %s\n", instructions[i].result, instructions[i].arg1, instructions[i].op, instructions[i].arg2);
         }
     }
 }
+
 
 void write_TAC(const char* filename, TACInstruction* instructions, int num_instructions) {
     FILE* file = fopen(filename, "w");
@@ -218,27 +198,22 @@ void optimize_TAC(const char* input_filename, const char* output_filename) {
         return;
     }
 
-    printf("Initial TAC:\n");
-    print_instructions(instructions, num_instructions);
-
     constant_folding(instructions, &num_instructions);
-    printf("After constant folding:\n");
-    print_instructions(instructions, num_instructions);
-
     algebraic_simplification(instructions, &num_instructions);
-    printf("After algebraic simplification:\n");
-    print_instructions(instructions, num_instructions);
-
     copy_propagation(instructions, &num_instructions);
-    printf("After copy propagation:\n");
-    print_instructions(instructions, num_instructions);
-
+    
+    // Mark print instructions as preserved
+    for (int i = 0; i < num_instructions; i++) {
+        if (strcmp(instructions[i].result, "print") == 0) {
+            instructions[i].is_preserved = 1;
+        }
+    }
+    
     dead_code_elimination(instructions, &num_instructions);
-    printf("After dead code elimination:\n");
-    print_instructions(instructions, num_instructions);
 
     write_TAC(output_filename, instructions, num_instructions);
 }
+
 
 void print_instructions(TACInstruction* instructions, int num_instructions) {
     for (int i = 0; i < num_instructions; i++) {
