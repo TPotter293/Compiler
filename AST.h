@@ -23,6 +23,8 @@ typedef struct ASTNode {
     char* id;       // For identifiers
     struct ASTNode* left;    // Left child
     struct ASTNode* right;   // Right child
+    int temp_var;         // <-- Add this line to store the temporary variable number.
+     char* temp_var_name;  // New field to store the temporary variable name
     struct {
         struct ASTNode** stmts;  // Array of statements
         int count;                // Number of statements

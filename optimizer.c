@@ -1,107 +1,256 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <ctype.h>
 
-#define MAX_TAC 100
-#define MAX_VARS 20
+#define MAX_INSTRUCTIONS 100
 
 typedef struct {
-    char op[4];    // Operation: +, -, *, /
-    char arg1[10]; // First argument
-    char arg2[10]; // Second argument
-    char result[10]; // Result
-} TAC;
+    char op[4];
+    char arg1[10];
+    char arg2[10];
+    char result[10];
+    int is_dead;
+    int is_optimized;
+    int is_preserved; // New field to mark preserved instructions
+} TACInstruction;
 
-// Function to check if a string represents a constant
-bool is_constant(const char *str) {
-    if (*str == '\0') return false;
-    while (*str) {
-        if (!isdigit(*str)) return false;
-        str++;
-    }
-    return true;
+void print_instructions(TACInstruction* instructions, int num_instructions);
+
+// Function declaration for read_TAC
+int read_TAC(const char* filename, TACInstruction* instructions);
+
+int is_number(const char* str) {
+    char* endptr;
+    strtol(str, &endptr, 10);
+    return *endptr == '\0';
 }
 
-// Function to evaluate a simple arithmetic expression if both arguments are constants
-int evaluate_expression(const char *op, const char *arg1, const char *arg2) {
-    int value1 = atoi(arg1);
-    int value2 = atoi(arg2);
-    
+// Make sure the read_TAC function is implemented in this file
+int read_TAC(const char* filename, TACInstruction* instructions) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        perror("Could not open file");
+        return -1;
+    }
+
+    int count = 0;
+    char line[100];
+    while (count < MAX_INSTRUCTIONS && fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = 0;
+        if (sscanf(line, "%s = %s %s %s", instructions[count].result, instructions[count].arg1, instructions[count].op, instructions[count].arg2) == 4) {
+            instructions[count].is_dead = 0;
+            instructions[count].is_optimized = 0;
+            instructions[count].is_preserved = 0; // Initialize preservation flag
+        } else if (sscanf(line, "%s = %s", instructions[count].result, instructions[count].arg1) == 2) {
+            instructions[count].op[0] = '\0';
+            instructions[count].arg2[0] = '\0';
+            instructions[count].is_dead = 0;
+            instructions[count].is_optimized = 0;
+            instructions[count].is_preserved = 0; // Initialize preservation flag
+        } else if (strncmp(line, "print", 5) == 0) {
+            sscanf(line, "print %s", instructions[count].arg1);
+            strcpy(instructions[count].result, "print");
+            instructions[count].op[0] = '\0';
+            instructions[count].arg2[0] = '\0';
+            instructions[count].is_dead = 0;
+            instructions[count].is_optimized = 0;
+            instructions[count].is_preserved = 0; // Initialize preservation flag
+        } else {
+            continue;
+        }
+        printf("Read instruction: %s = %s %s %s\n", instructions[count].result, instructions[count].arg1, instructions[count].op, instructions[count].arg2);
+        count++;
+    }
+
+    fclose(file);
+    return count;
+}
+
+int evaluate_constant_expression(int value1, int value2, const char* op) {
     if (strcmp(op, "+") == 0) return value1 + value2;
     if (strcmp(op, "-") == 0) return value1 - value2;
     if (strcmp(op, "*") == 0) return value1 * value2;
-    if (strcmp(op, "/") == 0) return value1 / value2;
-
-    return 0; // In case of unknown operation
+    if (strcmp(op, "/") == 0 && value2 != 0) return value1 / value2;
+    return value1; // Default case or invalid operation
 }
 
-// Function to perform constant propagation optimization
-void constant_propagation(TAC tac[], int count) {
-    for (int i = 0; i < count; i++) {
-        // Print the original TAC for debugging
-        printf("Original TAC[%d]: %s = %s %s %s\n", i, tac[i].result, tac[i].arg1, tac[i].op, tac[i].arg2);
+void constant_folding(TACInstruction* instructions, int* num_instructions) {
+    for (int i = 0; i < *num_instructions; i++) {
+        // Check if the operation is valid
+        if (instructions[i].op[0] != '\0') {
+            int arg1_val = 0, arg2_val = 0;
+            int arg1_is_const = is_number(instructions[i].arg1);
+            int arg2_is_const = is_number(instructions[i].arg2);
+            int temp_index;
 
-        // Replace assignments of constants
-        if (strcmp(tac[i].op, "=") == 0 && is_constant(tac[i].arg1)) {
-            // Update the TAC with constant value
-            sprintf(tac[i].arg1, "%s", tac[i].arg1);
-            printf("Updated TAC[%d]: %s = %s (constant propagation)\n", i, tac[i].result, tac[i].arg1);
-        }
+            // Evaluate arg1
+            if (arg1_is_const) {
+                arg1_val = atoi(instructions[i].arg1);
+            } else if (sscanf(instructions[i].arg1, "t%d", &temp_index) == 1) {
+                arg1_val = atoi(instructions[temp_index].arg1);
+            }
 
-        // Try to evaluate expressions with constants
-        if (strcmp(tac[i].op, "+") == 0 && is_constant(tac[i].arg1) && is_constant(tac[i].arg2)) {
-            int result = evaluate_expression(tac[i].op, tac[i].arg1, tac[i].arg2);
-            strcpy(tac[i].op, "=");
-            sprintf(tac[i].arg1, "%d", result);
-            strcpy(tac[i].arg2, ""); // Clear arg2
-            printf("Evaluated TAC[%d]: %s = %s (result)\n", i, tac[i].result, tac[i].arg1);
+            // Evaluate arg2
+            if (arg2_is_const) {
+                arg2_val = atoi(instructions[i].arg2);
+            } else if (sscanf(instructions[i].arg2, "t%d", &temp_index) == 1) {
+                arg2_val = atoi(instructions[temp_index].arg1);
+            }
+
+            // Perform constant folding only if both args are constants
+            if (arg1_is_const && arg2_is_const) {
+                int folded_value = evaluate_constant_expression(arg1_val, arg2_val, instructions[i].op);
+                
+                // Update the instruction with the folded value
+                snprintf(instructions[i].arg1, sizeof(instructions[i].arg1), "%d", folded_value);
+                instructions[i].op[0] = '\0'; // Clear the operation
+                instructions[i].arg2[0] = '\0'; // Clear the second argument
+
+                // Print the folded instruction for debugging
+                printf("Folded instruction: %s = %d\n", instructions[i].result, folded_value);
+            }
         }
     }
 }
 
-// Function to optimize TAC by reading from input file, performing optimization, and writing to output file
-void optimize_TAC(const char* input_file, const char* output_file) {
-    TAC tac[MAX_TAC];
-    int count = 0;
 
-    FILE *in = fopen(input_file, "r");
-    if (in == NULL) {
-        printf("Error: Could not open input file.\n");
+
+
+
+void algebraic_simplification(TACInstruction* instructions, int* num_instructions) {
+    for (int i = 0; i < *num_instructions; i++) {
+        if (strcmp(instructions[i].op, "+") == 0 || strcmp(instructions[i].op, "-") == 0) {
+            if (strcmp(instructions[i].arg2, "0") == 0) {
+                // Simplification: x + 0 -> x or x - 0 -> x
+                instructions[i].op[0] = '\0';
+                instructions[i].arg2[0] = '\0';
+                instructions[i].is_optimized = 1;
+                printf("Simplified: %s = %s\n", instructions[i].result, instructions[i].arg1);
+            }
+        } else if (strcmp(instructions[i].op, "*") == 0) {
+            if (strcmp(instructions[i].arg1, "1") == 0) {
+                // Simplification: 1 * x -> x
+                strcpy(instructions[i].arg1, instructions[i].arg2);
+                instructions[i].op[0] = '\0';
+                instructions[i].arg2[0] = '\0';
+                instructions[i].is_optimized = 1;
+                printf("Simplified: %s = %s\n", instructions[i].result, instructions[i].arg1);
+            } else if (strcmp(instructions[i].arg2, "1") == 0) {
+                // Simplification: x * 1 -> x
+                instructions[i].op[0] = '\0';
+                instructions[i].arg2[0] = '\0';
+                instructions[i].is_optimized = 1;
+                printf("Simplified: %s = %s\n", instructions[i].result, instructions[i].arg1);
+            }
+        }
+    }
+}
+
+void copy_propagation(TACInstruction* instructions, int* num_instructions) {
+    for (int i = 0; i < *num_instructions; i++) {
+        if (instructions[i].op[0] == '\0' && !is_number(instructions[i].arg1)) {
+            for (int j = i + 1; j < *num_instructions; j++) {
+                if (strcmp(instructions[j].arg1, instructions[i].result) == 0) {
+                    strcpy(instructions[j].arg1, instructions[i].arg1);
+                    instructions[j].is_optimized = 1;
+                }
+                if (strcmp(instructions[j].arg2, instructions[i].result) == 0) {
+                    strcpy(instructions[j].arg2, instructions[i].arg1);
+                    instructions[j].is_optimized = 1;
+                }
+            }
+        }
+    }
+}
+
+void dead_code_elimination(TACInstruction* instructions, int* num_instructions) {
+    int used_instructions[MAX_INSTRUCTIONS] = {0};
+
+    // Track dependencies
+    for (int i = 0; i < *num_instructions; i++) {
+        if (!instructions[i].is_dead && !instructions[i].is_preserved) { // Skip preserved instructions
+            for (int j = i + 1; j < *num_instructions; j++) {
+                if (strcmp(instructions[j].arg1, instructions[i].result) == 0 || strcmp(instructions[j].arg2, instructions[i].result) == 0) {
+                    used_instructions[i] = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Mark instructions as dead if not used and not preserved
+    for (int i = 0; i < *num_instructions; i++) {
+        if (!used_instructions[i] && strcmp(instructions[i].result, "print") != 0 && !instructions[i].is_preserved) {
+            instructions[i].is_dead = 1;
+            instructions[i].is_optimized = 1;
+            printf("Eliminated dead code: %s = %s %s %s\n", instructions[i].result, instructions[i].arg1, instructions[i].op, instructions[i].arg2);
+        }
+    }
+}
+
+void write_TAC(const char* filename, TACInstruction* instructions, int num_instructions) {
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        perror("Could not open file");
         return;
     }
 
-    // Read the TAC from the input file
-    while (count < MAX_TAC && fscanf(in, "%s = %s %s %s", tac[count].result, tac[count].arg1, tac[count].op, tac[count].arg2) == 4) {
-        count++;
-    }
-
-    while (count < MAX_TAC && fscanf(in, "%s = %s", tac[count].result, tac[count].arg1) == 2) {
-        strcpy(tac[count].op, "=");
-        strcpy(tac[count].arg2, "");
-        count++;
-    }
-
-    fclose(in);
-    
-    // Perform constant propagation optimization
-    constant_propagation(tac, count);
-
-    // Write the optimized TAC to the output file
-    FILE *out = fopen(output_file, "w");
-    if (out == NULL) {
-        printf("Error: Could not open output file.\n");
-        return;
-    }
-
-    for (int i = 0; i < count; i++) {
-        if (strlen(tac[i].arg2) == 0) {
-            fprintf(out, "%s = %s\n", tac[i].result, tac[i].arg1);
-        } else {
-            fprintf(out, "%s = %s %s %s\n", tac[i].result, tac[i].arg1, tac[i].op, tac[i].arg2);
+    for (int i = 0; i < num_instructions; i++) {
+        if (!instructions[i].is_dead) {
+            if (strcmp(instructions[i].result, "print") == 0) {
+                fprintf(file, "print %s\n", instructions[i].arg1);
+            } else if (instructions[i].op[0] != '\0') {
+                fprintf(file, "%s = %s %s %s\n", instructions[i].result, instructions[i].arg1, instructions[i].op, instructions[i].arg2);
+            } else {
+                fprintf(file, "%s = %s\n", instructions[i].result, instructions[i].arg1);
+            }
         }
     }
 
-    fclose(out);
+    fclose(file);
+}
+
+void optimize_TAC(const char* input_filename, const char* output_filename) {
+    TACInstruction instructions[MAX_INSTRUCTIONS];
+
+    int num_instructions = read_TAC(input_filename, instructions);
+    if (num_instructions == -1) {
+        return;
+    }
+
+    printf("Initial TAC:\n");
+    print_instructions(instructions, num_instructions);
+
+    constant_folding(instructions, &num_instructions);
+    printf("After constant folding:\n");
+    print_instructions(instructions, num_instructions);
+
+    algebraic_simplification(instructions, &num_instructions);
+    printf("After algebraic simplification:\n");
+    print_instructions(instructions, num_instructions);
+
+    copy_propagation(instructions, &num_instructions);
+    printf("After copy propagation:\n");
+    print_instructions(instructions, num_instructions);
+
+    dead_code_elimination(instructions, &num_instructions);
+    printf("After dead code elimination:\n");
+    print_instructions(instructions, num_instructions);
+
+    write_TAC(output_filename, instructions, num_instructions);
+}
+
+void print_instructions(TACInstruction* instructions, int num_instructions) {
+    for (int i = 0; i < num_instructions; i++) {
+        if (!instructions[i].is_dead) {
+            if (strcmp(instructions[i].result, "print") == 0) {
+                printf("print %s\n", instructions[i].arg1);
+            } else if (instructions[i].op[0] != '\0') {
+                printf("%s = %s %s %s\n", instructions[i].result, instructions[i].arg1, instructions[i].op, instructions[i].arg2);
+            } else {
+                printf("%s = %s\n", instructions[i].result, instructions[i].arg1);
+            }
+        }
+    }
+    printf("\n");
 }
