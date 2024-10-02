@@ -60,30 +60,29 @@ void generateTAC(ASTNode* node) {
             generateTACLine(tac_line);
             break;
         case NODE_TYPE_BINARY_OP:
-            // Generate TAC for left and right operands first
-            generateTAC(node->left);
-            generateTAC(node->right);
+    // Generate TAC for left and right operands first
+        generateTAC(node->left);
+        generateTAC(node->right);
 
-            // Check if both operands are constants
+    // Check if both operands are constants
             if (node->left->type == NODE_TYPE_NUMBER && node->right->type == NODE_TYPE_NUMBER) {
-                // Perform constant folding
+        // Perform constant folding
                 int result = 0;
                 if (strcmp(node->op, "+") == 0) {
-                    result = node->left->value + node->right->value;
+            result = node->left->value + node->right->value;
                 } else if (strcmp(node->op, "-") == 0) {
-                    result = node->left->value - node->right->value;
+            result = node->left->value - node->right->value;
                 } else if (strcmp(node->op, "*") == 0) {
-                    result = node->left->value * node->right->value;
+            result = node->left->value * node->right->value;
                 } else if (strcmp(node->op, "/") == 0) {
-                    result = node->left->value / node->right->value;
-                }
+            result = node->left->value / node->right->value;
+        }
 
-                // Create a new temporary variable for the result
-                char* temp = newTemp(); // Function to generate new temporary variable names
-                sprintf(tac_line, "%s = %d", temp, result);
-                printf("DEBUG: Constant Folding TAC -> %s\n", tac_line);
-                generateTACLine(tac_line);
-                node->temp_var_name = temp; // Store temp variable for further use
+        // Create a new temporary variable for the result
+        char* temp = newTemp();
+        sprintf(tac_line, "%s = %d", temp, result);
+        printf("DEBUG: Constant Folding TAC -> %s\n", tac_line);
+        generateTACLine(tac_line);
             } else {
                 // Create a new temporary variable for the result of the binary operation
                 char* temp = newTemp();
@@ -147,12 +146,17 @@ void analyzeDeclaration(ASTNode* node) {
 }
 
 void analyzeAssignment(ASTNode* node) {
-    analyzeNode(node->right);
-    
+    analyzeNode(node->right);  // Analyze the right-hand side to get temp_var_name
+
     char tac_line[100];
     sprintf(tac_line, "%s = %s", node->left->id, node->right->temp_var_name);
     generateTACLine(tac_line);
+
+    node->left->temp_var_name = node->right->temp_var_name;  // Assign temp_var_name to the left-hand side
+    updateIdToTemp(node->left->id, getIdIndex(node->right->temp_var_name));
+
 }
+
 
 void analyzeWrite(ASTNode* node) {
     analyzeNode(node->left);
@@ -169,15 +173,39 @@ void analyzeBinaryOp(ASTNode* node) {
     char* temp = newTemp();
     char tac_line[100];
 
+    if (node->left->temp_var_name == NULL || node->right->temp_var_name == NULL) {
+        fprintf(stderr, "Error: Uninitialized variable in binary operation\n");
+        exit(1);
+    }
+
     sprintf(tac_line, "%s = %s %s %s", temp, node->left->temp_var_name, node->op, node->right->temp_var_name);
     printf("DEBUG: Binary Operation TAC -> %s\n", tac_line);
     generateTACLine(tac_line);
 
     node->temp_var_name = temp;
+
+    int temp_var_index = getIdIndex(temp);
+    updateIdToTemp(temp, temp_var_index);
 }
+
+
 void analyzeIdentifier(ASTNode* node) {
-    // Skip TAC generation for identifiers
+    int index = getIdIndex(node->id);
+    if (index != -1) {
+        node->temp_var_name = id_to_temp[index].name;
+    } else {
+        // Initialize uninitialized variables with a default value (e.g., 0)
+        char* temp = newTemp();
+        char tac_line[100];
+        sprintf(tac_line, "%s = 0", temp);
+        generateTACLine(tac_line);
+        node->temp_var_name = temp;
+        updateIdToTemp(node->id, getIdIndex(temp));
+        fprintf(stderr, "Warning: Initializing uninitialized variable %s to 0\n", node->id);
+    }
 }
+
+
 
 void analyzeNode(ASTNode* node) {
     if (node == NULL) {
@@ -210,6 +238,10 @@ void analyzeNode(ASTNode* node) {
                 sprintf(tac_line, "%s = %d", temp, node->value);
                 generateTACLine(tac_line);
                 node->temp_var_name = temp;
+
+                int temp_var_index = getIdIndex(temp);
+                updateIdToTemp(temp, temp_var_index);
+
             }
             break;
         default:
