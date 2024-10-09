@@ -64,6 +64,18 @@ ws          {delim}+
                 return WRITE;
               }
 
+"function"   { words++; chars += strlen(yytext);
+                printf("%s : FUNCTION\n", yytext);
+                yylval.strval = strdup(yytext);
+                return FUNCTION;
+              }
+
+"var"        { words++; chars += strlen(yytext);
+                printf("%s : VAR\n", yytext);
+                yylval.strval = strdup(yytext);
+                return VAR;
+              }
+
 %{
 	// Control flow keywords
 %}
@@ -136,6 +148,13 @@ ws          {delim}+
                 return DIVIDE;
               }
 
+","          { chars++;
+                printf("%s : COMMA\n", yytext);
+                return COMMA;
+              }
+
+\n {lines++; chars = 0;}
+
 %{
 	// Logical operators
 %}
@@ -200,4 +219,3 @@ ws          {delim}+
                 printf("%s : Unrecognized symbol at line %d char %d\n", yytext, lines, chars);
               }
 %%
-
