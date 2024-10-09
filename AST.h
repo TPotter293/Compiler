@@ -13,8 +13,12 @@ typedef enum {
     NODE_TYPE_IDENTIFIER,
     NODE_TYPE_BINARY_OP,
     NODE_TYPE_UNARY_OP,
-    // Add other types as needed
+    NODE_TYPE_VARIABLE_DECLARATION,
+    NODE_TYPE_FUNCTION_DECLARATION,
+    NODE_TYPE_PARAMETER,
+    NODE_TYPE_PARAMETERS
 } NodeType;
+
 
 typedef struct ASTNode {
     NodeType type;  // Added node type field
@@ -25,10 +29,30 @@ typedef struct ASTNode {
     struct ASTNode* right;   // Right child
     int temp_var;         // <-- Add this line to store the temporary variable number.
      char* temp_var_name;  // New field to store the temporary variable name
-    struct {
-        struct ASTNode** stmts;  // Array of statements
-        int count;                // Number of statements
-    } statements;  // For holding multiple statements
+    union {
+        struct {
+            struct ASTNode** stmts;
+            int count;
+        } statements;
+        struct {
+            struct ASTNode* identifier;
+            struct ASTNode* varType;
+        } varDecl;
+        struct {
+            struct ASTNode* identifier;
+            struct ASTNode* parameters;
+            struct ASTNode* returnType;
+            struct ASTNode* body;
+        } funcDecl;
+        struct {
+            struct ASTNode* identifier;
+            struct ASTNode* paramType;
+        } param;
+        struct {
+            struct ASTNode** params;
+            int count;
+        } parameters;
+    };
 } ASTNode;
 
 // Function declarations for creating AST nodes
@@ -42,6 +66,11 @@ ASTNode* createNumberNode(int value);
 ASTNode* createIdentifierNode(char* id);
 ASTNode* createBinaryOpNode(char* op, ASTNode* left, ASTNode* right);
 ASTNode* createUnaryOpNode(ASTNode* expr);
+ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type);
+ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType, ASTNode* body);
+ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type);
+ASTNode* createParametersNode(ASTNode* parameter, int count);
+
 
 // Function for creating a statement node
 ASTNode* createStatementsNode(ASTNode** stmts, int count);

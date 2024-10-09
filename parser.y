@@ -18,6 +18,14 @@ void yyerror(const char* s) {
     fprintf(stderr, "Parse error: %s\n", s);
     exit(1);
 }
+
+char** extractParamTypes(ASTNode** params, int count) {
+    char** types = malloc(count * sizeof(char*));
+    for (int i = 0; i < count; i++) {
+        types[i] = strdup(params[i]->id);  // Assuming the type is stored in the 'id' field
+    }
+    return types;
+}
 %}
 
 // Declare the union for storing various types, including ASTNode pointers
@@ -27,13 +35,13 @@ void yyerror(const char* s) {
     struct ASTNode* node;     // For AST nodes
 }
 
-%token WRITE IF ELSE RETURN
+%token WRITE IF ELSE RETURN FUNCTION VAR
 %token <intval> NUMBER
 %token <strval> TYPE IDENTIFIER
 %token <char> SEMICOLON EQ PLUS MINUS MULT DIVIDE
-%token <char> NOT LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE
+%token <char> NOT LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE COMMA
 
-%type <node> program statements statement expression declaration assignment write_statement if_statement return_statement
+%type <node> program statements statement expression declaration assignment write_statement if_statement return_statement function_declaration variable_declaration parameter_list parameters
 
 %left OR
 %left AND
@@ -96,6 +104,16 @@ statement:
         $$ = $1;
         printf("Return statement parsed.\n");
     }
+    | function_declaration
+    {
+        $$ = $1;
+        printf("Function declaration parsed.\n");
+    }
+    | variable_declaration
+    {
+        $$ = $1;
+        printf("Variable declaration parsed.\n");
+    }
     ;
 
 declaration:
@@ -103,12 +121,67 @@ declaration:
     {
         $$ = createDeclarationNode(createIdentifierNode($1), createIdentifierNode($2));
         printf("Declaration of variable '%s' of type '%s'.\n", $2, $1);
-        insert_symbol($2, $1);
+        insert_symbol($2, $1, NULL, 0, NULL);
         print_symbol_table();
         free($1);
         free($2);
     }
     ;
+
+    variable_declaration:
+    VAR IDENTIFIER TYPE SEMICOLON
+    {
+        $$ = createVariableDeclarationNode(createIdentifierNode($2), createIdentifierNode($3));
+        printf("Variable declaration: %s of type %s\n", $2, $3);
+        insert_symbol($2, $3, NULL, 0, NULL);
+        print_symbol_table();
+        free($2);
+        free($3);
+    }
+    ;
+
+    function_declaration:
+    FUNCTION IDENTIFIER LPAREN parameter_list RPAREN TYPE LBRACE statements RBRACE
+    {
+        $$ = createFunctionDeclarationNode(createIdentifierNode($2), $4, createIdentifierNode($6), $8);
+        printf("Function declaration: %s\n", $2);
+        char** paramTypes = extractParamTypes($4->parameters.params, $4->parameters.count);
+        insert_symbol($2, "function", paramTypes, $4->parameters.count, $6);
+        for (int i = 0; i < $4->parameters.count; i++) {
+            free(paramTypes[i]);
+        }
+        free(paramTypes);
+        print_symbol_table();
+        free($2);
+        free($6);
+    }
+    ;
+
+    parameter_list:
+    parameters
+    | /* empty */
+    {
+        $$ = NULL;
+    }
+    ;
+
+    parameters:
+    parameters COMMA TYPE IDENTIFIER
+    {
+        $$ = $1;
+        $$->parameters.params = realloc($$->parameters.params, ($$->parameters.count + 1) * sizeof(ASTNode*));
+        $$->parameters.params[$$->parameters.count++] = createParameterNode(createIdentifierNode($3), createIdentifierNode($4));
+        free($3);
+        free($4);
+    }
+    |  TYPE IDENTIFIER
+    {
+        $$ = createParametersNode(createParameterNode(createIdentifierNode($1), createIdentifierNode($2)), 1);
+        free($1);
+        free($2);
+    }
+    ;
+
 
 assignment:
     IDENTIFIER EQ expression SEMICOLON

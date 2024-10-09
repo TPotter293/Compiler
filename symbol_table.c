@@ -12,7 +12,7 @@ void init_symbol_table() {
 }
 
 // Insert a new symbol
-void insert_symbol(char *name, char *type) {
+void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, char* returnType) {
     // Check for redeclaration
     if (lookup_symbol(name) != -1) {
         printf("Error: redeclaration of %s\n", name);
@@ -22,6 +22,21 @@ void insert_symbol(char *name, char *type) {
     // Insert new symbol
     symbol_table[symbol_count].name = strdup(name);
     symbol_table[symbol_count].type = strdup(type);
+    
+    if (strcmp(type, "function") == 0) {
+        symbol_table[symbol_count].functionInfo = malloc(sizeof(FunctionInfo));
+        symbol_table[symbol_count].functionInfo->name = strdup(name);
+        symbol_table[symbol_count].functionInfo->returnType = strdup(returnType);
+        symbol_table[symbol_count].functionInfo->paramTypes = malloc(sizeof(char*) * paramCount);
+        symbol_table[symbol_count].functionInfo->paramCount = paramCount;
+        
+        for (int i = 0; i < paramCount; i++) {
+            symbol_table[symbol_count].functionInfo->paramTypes[i] = strdup(paramTypes[i]);
+        }
+    } else {
+        symbol_table[symbol_count].functionInfo = NULL;
+    }
+    
     symbol_count++;
 }
 
@@ -38,17 +53,33 @@ int lookup_symbol(char *name) {
 // Print symbol table
 void print_symbol_table() {
     printf("Symbol Table:\n");
-    printf("Index\tName\t\tType\n");
-    printf("--------------------------------\n");
+    printf("Index\tName\t\tType\t\tFunction Info\n");
+    printf("------------------------------------------------\n");
     
     for (int i = 0; i < symbol_count; i++) {
-        printf("%d\t%s\t\t%s\n", i, symbol_table[i].name, symbol_table[i].type);
+        printf("%d\t%s\t\t%s", i, symbol_table[i].name, symbol_table[i].type);
+        if (symbol_table[i].functionInfo != NULL) {
+            printf("\t\tReturn: %s, Params: ", symbol_table[i].functionInfo->returnType);
+            for (int j = 0; j < symbol_table[i].functionInfo->paramCount; j++) {
+                printf("%s ", symbol_table[i].functionInfo->paramTypes[j]);
+            }
+        }
+        printf("\n");
     }
 }
 
 void clean_up_symbol_table() {
     for (int i = 0; i < symbol_count; i++) {
-        free(symbol_table[i].name);  // Free allocated name memory
-        free(symbol_table[i].type);  // Free allocated type memory
+        free(symbol_table[i].name);
+        free(symbol_table[i].type);
+        if (symbol_table[i].functionInfo != NULL) {
+            free(symbol_table[i].functionInfo->name);
+            free(symbol_table[i].functionInfo->returnType);
+            for (int j = 0; j < symbol_table[i].functionInfo->paramCount; j++) {
+                free(symbol_table[i].functionInfo->paramTypes[j]);
+            }
+            free(symbol_table[i].functionInfo->paramTypes);
+            free(symbol_table[i].functionInfo);
+        }
     }
 }

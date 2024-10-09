@@ -119,6 +119,42 @@ ASTNode* createUnaryOpNode(ASTNode* expr) {
     return node;
 }
 
+ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_TYPE_VARIABLE_DECLARATION;
+    node->varDecl.identifier = identifier;
+    node->varDecl.varType = type;
+    return node;
+}
+
+ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType, ASTNode* body) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_TYPE_FUNCTION_DECLARATION;
+    node->funcDecl.identifier = identifier;
+    node->funcDecl.parameters = parameters;
+    node->funcDecl.returnType = returnType;
+    node->funcDecl.body = body;
+    return node;
+}
+
+ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_TYPE_PARAMETER;
+    node->param.identifier = identifier;
+    node->param.paramType = type;
+    return node;
+}
+
+ASTNode* createParametersNode(ASTNode* parameter, int count) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_TYPE_PARAMETERS;
+    node->parameters.params = malloc(sizeof(ASTNode*) * count);
+    node->parameters.params[0] = parameter;
+    node->parameters.count = count;
+    return node;
+}
+
+
 // Recursive function to print the AST
 void printAST(ASTNode* node, int indentLevel) {
     if (node == NULL) {
