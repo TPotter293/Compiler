@@ -21,6 +21,8 @@ void init_symbol_table();
 void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, char* returnType);
 int lookup_symbol(char *name);
 void print_symbol_table();
+void freeParamTypes(char** paramTypes, int count);
+
 void clean_up_symbol_table();
 
 #endif
