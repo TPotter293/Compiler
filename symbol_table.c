@@ -68,6 +68,14 @@ void print_symbol_table() {
     }
 }
 
+void freeParamTypes(char** paramTypes, int count) {
+    for (int i = 0; i < count; i++) {
+        free(paramTypes[i]);
+    }
+    free(paramTypes);
+}
+
+
 void clean_up_symbol_table() {
     for (int i = 0; i < symbol_count; i++) {
         free(symbol_table[i].name);
