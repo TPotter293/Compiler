@@ -2,10 +2,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include "AST.h"
+#define DEBUG_MEMORY(msg, ptr) printf("DEBUG MEMORY: %s %p\n", msg, (void*)ptr)
 
 // Helper function to allocate a new node
 ASTNode* createNode() {
     ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
+    DEBUG_MEMORY("Allocated node", node);
+    if (node == NULL) {
+        fprintf(stderr, "Memory allocation failed in createNode\n");
+        return NULL;
+    }
     node->left = NULL;
     node->right = NULL;
     node->op = NULL;
@@ -19,10 +25,17 @@ ASTNode* createNode() {
 // Create a node for statements
 ASTNode* createStatementsNode(ASTNode** stmts, int count) {
     ASTNode* node = createNode();
-    node->type = NODE_TYPE_STATEMENT;  // Set node type
-    node->statements.stmts = (ASTNode**)malloc(count * sizeof(ASTNode*)); // Allocate memory for statement pointers
+    if (node == NULL) return NULL;
+    node->type = NODE_TYPE_STATEMENT;
+    node->statements.stmts = (ASTNode**)malloc(count * sizeof(ASTNode*));
+    DEBUG_MEMORY("Allocated statements array", node->statements.stmts);
+    if (node->statements.stmts == NULL) {
+        fprintf(stderr, "Memory allocation failed for statements array\n");
+        free(node);
+        return NULL;
+    }
     for (int i = 0; i < count; ++i) {
-        node->statements.stmts[i] = stmts[i];  // Copy pointers
+        node->statements.stmts[i] = stmts[i];
     }
     node->statements.count = count;
     return node;
@@ -44,6 +57,23 @@ ASTNode* createDeclarationNode(ASTNode* type, ASTNode* id) {
     node->type = NODE_TYPE_DECLARATION; // Set node type
     node->left = type;  // Type goes to left child
     node->right = id;   // Identifier goes to right child
+    return node;
+}
+
+// Create a function prototype node
+ASTNode* createFunctionPrototypeNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType) {
+    ASTNode* node = createNode();
+    if (!node) {
+        printf("Memory allocation failed for function prototype node\n");
+        exit(1);
+    }
+    node->type = NODE_TYPE_FUNCTION_PROTOTYPE;  // Set the correct node type
+    node->funcProto.identifier = identifier;
+    node->funcProto.parameters = parameters;
+    node->funcProto.returnType = returnType;
+
+    printf("DEBUG: Function prototype node created with identifier: %s\n", identifier->id);
+
     return node;
 }
 
@@ -119,8 +149,9 @@ ASTNode* createUnaryOpNode(ASTNode* expr) {
     return node;
 }
 
+// Create a variable declaration node
 ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type) {
-    ASTNode* node = malloc(sizeof(ASTNode));
+    ASTNode* node = createNode();
     node->type = NODE_TYPE_VARIABLE_DECLARATION;
     node->varDecl.identifier = identifier;
     node->varDecl.varType = type;
@@ -128,32 +159,58 @@ ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type) {
 }
 
 ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType, ASTNode* body) {
-    ASTNode* node = malloc(sizeof(ASTNode));
+    ASTNode* node = createNode();
     node->type = NODE_TYPE_FUNCTION_DECLARATION;
-    node->funcDecl.identifier = identifier;
-    node->funcDecl.parameters = parameters;
-    node->funcDecl.returnType = returnType;
-    node->funcDecl.body = body;
+    node->id = strdup(identifier->id);  // Make a copy of the function name
+    node->left = parameters;
+    node->right = returnType;
+    
+    // Deep copy the statements from the body
+    node->statements.count = body->statements.count;
+    node->statements.stmts = malloc(sizeof(ASTNode*) * node->statements.count);
+    for (int i = 0; i < node->statements.count; i++) {
+        node->statements.stmts[i] = body->statements.stmts[i];
+    }
+    
+    // Free the temporary body node
+    free(body);
+    
     return node;
 }
 
+
+
+// Add a new function for debugging AST nodes
+void debugPrintNode(ASTNode* node, const char* message) {
+    if (node == NULL) {
+        printf("DEBUG: %s is NULL\n", message);
+        return;
+    }
+    printf("DEBUG: %s - Type: %d, Address: %p\n", message, node->type, (void*)node);
+}
+
+// Create a parameter node
 ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type) {
-    ASTNode* node = malloc(sizeof(ASTNode));
+    ASTNode* node = createNode();
     node->type = NODE_TYPE_PARAMETER;
     node->param.identifier = identifier;
     node->param.paramType = type;
     return node;
 }
 
+// Create a parameters node
 ASTNode* createParametersNode(ASTNode* parameter, int count) {
-    ASTNode* node = malloc(sizeof(ASTNode));
+    ASTNode* node = createNode();
     node->type = NODE_TYPE_PARAMETERS;
-    node->parameters.params = malloc(sizeof(ASTNode*) * count);
+    node->parameters.params = (ASTNode**)malloc(sizeof(ASTNode*) * count);
+    if (node->parameters.params == NULL) {
+        fprintf(stderr, "Memory allocation failed for parameters array\n");
+        return NULL;
+    }
     node->parameters.params[0] = parameter;
     node->parameters.count = count;
     return node;
 }
-
 
 // Recursive function to print the AST
 void printAST(ASTNode* node, int indentLevel) {
@@ -161,9 +218,6 @@ void printAST(ASTNode* node, int indentLevel) {
         printf("DEBUG: Encountered NULL node at indent level %d\n", indentLevel);
         return;
     }
-
-    printf("DEBUG: Processing node at indent level %d\n", indentLevel);
-    printf("DEBUG: Node address: %p\n", (void*)node);
 
     // Print indentation for current level
     for (int i = 0; i < indentLevel; i++) {
@@ -177,62 +231,67 @@ void printAST(ASTNode* node, int indentLevel) {
             for (int i = 0; i < node->statements.count; i++) {
                 printAST(node->statements.stmts[i], indentLevel + 1);
             }
-            return; // Return here to avoid processing left and right children        case NODE_TYPE_STATEMENT:
-            printf("DEBUG: Node type: Statement\n");
-            printf("DEBUG: Processing %d statements\n", node->statements.count);
+            return;
+        case NODE_TYPE_STATEMENT:
+            printf("Statement node\n");
             for (int i = 0; i < node->statements.count; i++) {
                 printAST(node->statements.stmts[i], indentLevel + 1);
             }
             break;
         case NODE_TYPE_DECLARATION:
-            printf("DEBUG: Node type: Declaration\n");
+            printf("Declaration node\n");
             break;
         case NODE_TYPE_ASSIGNMENT:
-            printf("DEBUG: Node type: Assignment\n");
+            printf("Assignment node\n");
             break;
         case NODE_TYPE_WRITE:
-            printf("DEBUG: Node type: Write\n");
+            printf("Write node\n");
             break;
         case NODE_TYPE_IF:
-            printf("DEBUG: Node type: If\n");
+            printf("If node\n");
             break;
         case NODE_TYPE_RETURN:
-            printf("DEBUG: Node type: Return\n");
+            printf("Return node\n");
             break;
         case NODE_TYPE_NUMBER:
-            printf("DEBUG: Node type: Number\n");
-            printf("DEBUG: Number value: %d\n", node->value);
+            printf("Number node: %d\n", node->value);
             break;
         case NODE_TYPE_IDENTIFIER:
-            printf("DEBUG: Node type: Identifier\n");
-            printf("DEBUG: Identifier value: %s\n", node->id);
+            printf("Identifier node: %s\n", node->id);
             break;
         case NODE_TYPE_BINARY_OP:
-            printf("DEBUG: Node type: Binary Operator\n");
-            printf("DEBUG: Operator value: %s\n", node->op);
+            printf("Binary Op node: %s\n", node->op);
             break;
         case NODE_TYPE_UNARY_OP:
-            printf("DEBUG: Node type: Unary Operator\n");
+            printf("Unary Op node\n");
             break;
         default:
-            printf("DEBUG: Node type is unknown or uninitialized\n");
+            printf("Unknown or uninitialized node\n");
     }
 
-    // Print left child
-    printf("DEBUG: Processing left child\n");
+    // Process left and right children
     if (node->left) {
         printAST(node->left, indentLevel + 1);
-    } else {
-        printf("DEBUG: Left child is NULL\n");
     }
-
-    // Print right child
-    printf("DEBUG: Processing right child\n");
     if (node->right) {
         printAST(node->right, indentLevel + 1);
-    } else {
-        printf("DEBUG: Right child is NULL\n");
     }
+}
 
-    printf("DEBUG: Finished processing node at indent level %d\n", indentLevel);
+// Free the AST
+void freeASTNode(ASTNode* node) {
+    if (node == NULL) return;
+    DEBUG_MEMORY("Freeing node", node);
+
+    if (node->op) free(node->op);
+    if (node->id) free(node->id);
+    if (node->statements.stmts) {
+        for (int i = 0; i < node->statements.count; i++) {
+            freeASTNode(node->statements.stmts[i]);
+        }
+        free(node->statements.stmts);
+    }
+    freeASTNode(node->left);
+    freeASTNode(node->right);
+    free(node);
 }
