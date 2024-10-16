@@ -8,8 +8,10 @@
 #include "optimizer.h"
 #include "code_generator.h"
 
+
 extern int yylex();
 extern int yyparse();
+extern int yylineno;
 extern FILE* yyin;
 
 ASTNode* root = NULL; // Root of the AST
@@ -17,6 +19,14 @@ ASTNode* root = NULL; // Root of the AST
 void yyerror(const char* s) {
     fprintf(stderr, "Parse error: %s\n", s);
     exit(1);
+}
+
+void syntaxError(const char *message) {
+    fprintf(stderr, "Syntax error: %s at line %d\n", message, yylineno);
+}
+
+void semanticError(const char *message) {
+    fprintf(stderr, "Semantic error: %s at line %d\n", message, yylineno);
 }
 
 char** extractParamTypes(ASTNode** params, int count) {
@@ -60,6 +70,7 @@ program:
         root = createProgramNode($1); // Assign root to the program node
         printf("Program parsed successfully!\n");
     }
+    | error {syntaxError("Invalid program structure"); YYABORT; }
     ;
 
 statements:
@@ -68,14 +79,14 @@ statements:
         $$ = $1;
         $$->statements.stmts = realloc($$->statements.stmts, ($$->statements.count + 1) * sizeof(ASTNode*));
         $$->statements.stmts[$$->statements.count++] = $2;
-        printf("DEBUG: Added statement to statements, now has %d statements\n", $$->statements.count);
     }
     | statement
     {
         $$ = createStatementsNode(&$1, 1);
-        printf("DEBUG: Created new statements node with 1 statement\n");
     }
+    | /* empty */ { $$ = createStatementsNode(NULL, 0); }
     ;
+
 
 
 statement:
@@ -140,28 +151,58 @@ declaration:
     }
     ;
 
-    function_declaration:
-    FUNCTION IDENTIFIER LPAREN parameter_list RPAREN TYPE LBRACE statements RBRACE
+function_declaration:
+    FUNCTION TYPE IDENTIFIER LPAREN parameter_list RPAREN LBRACE statements RBRACE
     {
-        $$ = createFunctionDeclarationNode(createIdentifierNode($2), $4, createIdentifierNode($6), $8);
-        printf("Function declaration: %s\n", $2);
-        char** paramTypes = extractParamTypes($4->parameters.params, $4->parameters.count);
-        insert_symbol($2, "function", paramTypes, $4->parameters.count, $6);
-        for (int i = 0; i < $4->parameters.count; i++) {
-            free(paramTypes[i]);
-        }
-        free(paramTypes);
-        print_symbol_table();
-        free($2);
-        free($6);
+        printf("DEBUG: Processing full function declaration for %s\n", $3);
+
+        // Create the nodes for function declaration
+        ASTNode* idNode = createIdentifierNode($3);
+        ASTNode* returnTypeNode = createIdentifierNode($2);
+
+        // Create function declaration node
+        $$ = createFunctionDeclarationNode(idNode, $5, returnTypeNode, $8);
+
+        // Extract and store parameter types
+        char** paramTypes = extractParamTypes($5->parameters.params, $5->parameters.count);
+        insert_symbol($3, "function", paramTypes, $5->parameters.count, $2);
+        freeParamTypes(paramTypes, $5->parameters.count);
+
+        printf("Full function declaration parsed: %s\n", $3);
+    }
+    | FUNCTION TYPE IDENTIFIER LPAREN parameter_list RPAREN SEMICOLON
+    {
+        printf("DEBUG: Processing function prototype for %s\n", $3);
+
+        // Create the nodes for function prototype
+        ASTNode* idNode = createIdentifierNode($3);
+        ASTNode* returnTypeNode = createIdentifierNode($2);
+
+        // Create function prototype node
+        $$ = createFunctionPrototypeNode(idNode, $5, returnTypeNode);
+
+        // Extract and store parameter types
+        char** paramTypes = extractParamTypes($5->parameters.params, $5->parameters.count);
+        insert_symbol($3, "function", paramTypes, $5->parameters.count, $2);
+        freeParamTypes(paramTypes, $5->parameters.count);
+
+        printf("Function prototype parsed: %s\n", $3);
     }
     ;
+
+
+
+
+
+
+
+
 
     parameter_list:
     parameters
     | /* empty */
     {
-        $$ = NULL;
+        $$ = createParametersNode(NULL, 0); // Empty parameter list
     }
     ;
 
@@ -174,13 +215,14 @@ declaration:
         free($3);
         free($4);
     }
-    |  TYPE IDENTIFIER
+    | TYPE IDENTIFIER
     {
         $$ = createParametersNode(createParameterNode(createIdentifierNode($1), createIdentifierNode($2)), 1);
         free($1);
         free($2);
     }
     ;
+
 
 
 assignment:
@@ -286,8 +328,13 @@ int main(int argc, char** argv) {
     }
 
     printf("Starting parser...\n");
-    yyparse();
-    printf("Parsing completed.\n");
+    int parse_result = yyparse();
+    if (parse_result == 0) {
+        printf("Parsing completed successfully.\n");
+    } else {
+        printf("Parsing failed.\n");
+        return 1;
+    }
 
     // Print the AST
     printf("Abstract Syntax Tree (AST):\n");
