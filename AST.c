@@ -4,6 +4,11 @@
 #include "AST.h"
 #define DEBUG_MEMORY(msg, ptr) printf("DEBUG MEMORY: %s %p\n", msg, (void*)ptr)
 
+// Add this line
+void freeNode(ASTNode* node);
+void debugPrintFunctionNode(ASTNode* node);
+
+
 // Helper function to allocate a new node
 ASTNode* createNode() {
     ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
@@ -25,31 +30,44 @@ ASTNode* createNode() {
 // Create a node for statements
 ASTNode* createStatementsNode(ASTNode** stmts, int count) {
     ASTNode* node = createNode();
-    if (node == NULL) return NULL;
+    if (!node) return NULL;
+    
     node->type = NODE_TYPE_STATEMENT;
-    node->statements.stmts = (ASTNode**)malloc(count * sizeof(ASTNode*));
-    DEBUG_MEMORY("Allocated statements array", node->statements.stmts);
-    if (node->statements.stmts == NULL) {
-        fprintf(stderr, "Memory allocation failed for statements array\n");
-        free(node);
-        return NULL;
+    if (count > 0) {
+        node->statements.stmts = malloc(count * sizeof(ASTNode*));
+        if (!node->statements.stmts) {
+            free(node);
+            return NULL;
+        }
+        
+        for (int i = 0; i < count; i++) {
+            node->statements.stmts[i] = stmts[i];
+        }
+        node->statements.count = count;
+    } else {
+        node->statements.stmts = NULL;
+        node->statements.count = 0;
     }
-    for (int i = 0; i < count; ++i) {
-        node->statements.stmts[i] = stmts[i];
-    }
-    node->statements.count = count;
+    
     return node;
 }
 
+
 // Create a program node with statements
 ASTNode* createProgramNode(ASTNode* stmtList) {
+    printf("DEBUG: Entering createProgramNode\n");
     ASTNode* node = createNode();
     node->type = NODE_TYPE_PROGRAM;
     node->statements = stmtList->statements;
-    printf("DEBUG: Created program node with %d statements\n", node->statements.count);
-    free(stmtList);  // Free the original stmtList node as we've moved its content
+
+    // Do not free stmtList here if you're still using it
+    free(stmtList);  // Free stmtList after transferring ownership
+    stmtList = NULL; // Prevent accidental use after freeing
+
+    printf("DEBUG: Exiting createProgramNode\n");
     return node;
 }
+
 
 // Create a declaration node with an identifier
 ASTNode* createDeclarationNode(ASTNode* type, ASTNode* id) {
@@ -158,25 +176,37 @@ ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type) {
     return node;
 }
 
+// Function declaration node creation with body management
 ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType, ASTNode* body) {
+    printf("DEBUG: Entering createFunctionDeclarationNode\n");
+    
     ASTNode* node = createNode();
     node->type = NODE_TYPE_FUNCTION_DECLARATION;
-    node->id = strdup(identifier->id);  // Make a copy of the function name
+    node->id = strdup(identifier->id);
     node->left = parameters;
     node->right = returnType;
     
-    // Deep copy the statements from the body
-    node->statements.count = body->statements.count;
-    node->statements.stmts = malloc(sizeof(ASTNode*) * node->statements.count);
-    for (int i = 0; i < node->statements.count; i++) {
-        node->statements.stmts[i] = body->statements.stmts[i];
+    if (body && body->statements.count > 0) {
+        node->statements.count = body->statements.count;
+        node->statements.stmts = malloc(sizeof(ASTNode*) * node->statements.count);
+        
+        // Deep copy each statement pointer
+        for (int i = 0; i < body->statements.count; i++) {
+            node->statements.stmts[i] = body->statements.stmts[i];
+            printf("DEBUG: Copied statement %d from %p to new location\n", 
+                   i, (void*)body->statements.stmts[i]);
+        }
+        
+        // Don't free the body node here - it will be freed later
+        body->statements.stmts = NULL;
+        body->statements.count = 0;
     }
-    
-    // Free the temporary body node
-    free(body);
     
     return node;
 }
+
+
+
 
 
 
@@ -189,6 +219,15 @@ void debugPrintNode(ASTNode* node, const char* message) {
     printf("DEBUG: %s - Type: %d, Address: %p\n", message, node->type, (void*)node);
 }
 
+// Add the new debug function here
+void debugPrintFunctionNode(ASTNode* node) {
+    printf("DEBUG: Function Node Details:\n");
+    printf("Address: %p\n", (void*)node);
+    printf("Type: %d\n", node->type);
+    printf("ID: %s\n", node->id ? node->id : "NULL");
+    printf("Statements count: %d\n", node->statements.count);
+}
+
 // Create a parameter node
 ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type) {
     ASTNode* node = createNode();
@@ -199,99 +238,120 @@ ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type) {
 }
 
 // Create a parameters node
-ASTNode* createParametersNode(ASTNode* parameter, int count) {
+ASTNode* createParametersNode(ASTNode** params, int count) {
     ASTNode* node = createNode();
     node->type = NODE_TYPE_PARAMETERS;
-    node->parameters.params = (ASTNode**)malloc(sizeof(ASTNode*) * count);
-    if (node->parameters.params == NULL) {
+    node->statements.count = count;
+    node->statements.stmts = malloc(sizeof(ASTNode*) * count);
+    if (node->statements.stmts == NULL) {
         fprintf(stderr, "Memory allocation failed for parameters array\n");
+        free(node);
         return NULL;
     }
-    node->parameters.params[0] = parameter;
-    node->parameters.count = count;
+    for (int i = 0; i < count; i++) {
+        node->statements.stmts[i] = params[i];
+    }
     return node;
 }
 
-// Recursive function to print the AST
 void printAST(ASTNode* node, int indentLevel) {
-    if (node == NULL) {
-        printf("DEBUG: Encountered NULL node at indent level %d\n", indentLevel);
-        return;
-    }
+    if (node == NULL) return;
 
-    // Print indentation for current level
     for (int i = 0; i < indentLevel; i++) {
-        printf("  ");
+        printf("  ");  // Indentation for readability
     }
 
-    // Identify the type of node and print relevant information
     switch (node->type) {
         case NODE_TYPE_PROGRAM:
-            printf("Program:\n");
-            for (int i = 0; i < node->statements.count; i++) {
-                printAST(node->statements.stmts[i], indentLevel + 1);
-            }
-            return;
-        case NODE_TYPE_STATEMENT:
-            printf("Statement node\n");
-            for (int i = 0; i < node->statements.count; i++) {
-                printAST(node->statements.stmts[i], indentLevel + 1);
-            }
+            printf("Program Node\n");
             break;
-        case NODE_TYPE_DECLARATION:
-            printf("Declaration node\n");
-            break;
-        case NODE_TYPE_ASSIGNMENT:
-            printf("Assignment node\n");
-            break;
-        case NODE_TYPE_WRITE:
-            printf("Write node\n");
-            break;
-        case NODE_TYPE_IF:
-            printf("If node\n");
-            break;
-        case NODE_TYPE_RETURN:
-            printf("Return node\n");
-            break;
-        case NODE_TYPE_NUMBER:
-            printf("Number node: %d\n", node->value);
-            break;
-        case NODE_TYPE_IDENTIFIER:
-            printf("Identifier node: %s\n", node->id);
-            break;
-        case NODE_TYPE_BINARY_OP:
-            printf("Binary Op node: %s\n", node->op);
-            break;
-        case NODE_TYPE_UNARY_OP:
-            printf("Unary Op node\n");
-            break;
+        // Add cases for each node type
         default:
-            printf("Unknown or uninitialized node\n");
+            printf("Unknown Node Type\n");
+            break;
     }
 
-    // Process left and right children
-    if (node->left) {
-        printAST(node->left, indentLevel + 1);
-    }
-    if (node->right) {
-        printAST(node->right, indentLevel + 1);
-    }
+    if (node->left) printAST(node->left, indentLevel + 1);
+    if (node->right) printAST(node->right, indentLevel + 1);
 }
 
-// Free the AST
-void freeASTNode(ASTNode* node) {
-    if (node == NULL) return;
-    DEBUG_MEMORY("Freeing node", node);
+void freeNode(ASTNode* node) {
+    if (!node) return;
 
-    if (node->op) free(node->op);
-    if (node->id) free(node->id);
+    printf("DEBUG: Starting to free node of type %d at %p\n", node->type, (void*)node);
+
+    // Free child nodes first
+    if (node->left) {
+        printf("DEBUG: Freeing left child at %p\n", (void*)node->left);
+        freeNode(node->left);
+        node->left = NULL;
+    }
+    
+    if (node->right) {
+        printf("DEBUG: Freeing right child at %p\n", (void*)node->right);
+        freeNode(node->right);
+        node->right = NULL;
+    }
+
+    // Free statements array if it exists
     if (node->statements.stmts) {
+        printf("DEBUG: Freeing statements of node\n");
         for (int i = 0; i < node->statements.count; i++) {
-            freeASTNode(node->statements.stmts[i]);
+            if (node->statements.stmts[i]) {
+                printf("DEBUG: Freeing statement %d at %p\n", i, (void*)node->statements.stmts[i]);
+                freeNode(node->statements.stmts[i]);
+                node->statements.stmts[i] = NULL;
+            }
         }
         free(node->statements.stmts);
+        node->statements.stmts = NULL;
     }
-    freeASTNode(node->left);
-    freeASTNode(node->right);
+
+    // Free string members
+    if (node->id) {
+        printf("DEBUG: Freeing node id: %s\n", node->id);
+        free(node->id);
+        node->id = NULL;
+    }
+    
+    if (node->op) {
+        printf("DEBUG: Freeing node op: %s\n", node->op);
+        free(node->op);
+        node->op = NULL;
+    }
+
     free(node);
+    printf("DEBUG: Freed node at %p\n", (void*)node);
 }
+
+
+void freeAST(ASTNode* root) {
+    if (!root) return;
+
+    printf("DEBUG: Starting AST cleanup for node type %d at %p\n", root->type, (void*)root);
+    
+    // Track statement ownership before cleanup
+    if (root->statements.count > 0) {
+        printf("DEBUG: Node %p has %d statements\n", (void*)root, root->statements.count);
+        for (int i = 0; i < root->statements.count; i++) {
+            printf("DEBUG: Statement %d at %p with type %d\n", 
+                   i, (void*)root->statements.stmts[i], 
+                   root->statements.stmts[i]->type);
+        }
+    }
+
+    // Track child nodes
+    if (root->left) {
+        printf("DEBUG: Processing left child at %p\n", (void*)root->left);
+        freeAST(root->left);
+    }
+    if (root->right) {
+        printf("DEBUG: Processing right child at %p\n", (void*)root->right);
+        freeAST(root->right);
+    }
+    
+    printf("DEBUG: Freeing node %p with type %d\n", (void*)root, root->type);
+    freeNode(root);
+}
+
+
