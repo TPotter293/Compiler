@@ -186,7 +186,6 @@ void analyzeBinaryOp(ASTNode* node) {
 
     int temp_var_index = getIdIndex(temp);
     updateIdToTemp(temp, temp_var_index);
-
 }
 
 
@@ -195,7 +194,6 @@ void analyzeIdentifier(ASTNode* node) {
     if (index != -1) {
         node->temp_var_name = id_to_temp[index].name;
     } else {
-
         // Initialize uninitialized variables with a default value (e.g., 0)
         char* temp = newTemp();
         char tac_line[100];
@@ -207,8 +205,117 @@ void analyzeIdentifier(ASTNode* node) {
     }
 }
 
+// Function to analyze function declarations
+void analyzeFunctionDeclaration(ASTNode* node) {
+    if (node == NULL) {
+        fprintf(stderr, "Error: NULL node in function declaration analysis\n");
+        return;
+    }
 
+    // Check that the node is indeed a function declaration
+    if (node->type != NODE_TYPE_FUNCTION_DECLARATION) {
+        fprintf(stderr, "Error: Node is not a function declaration\n");
+        return;
+    }
 
+    // Example checks (you can expand these based on your language's semantics)
+    // Check the function identifier
+    if (node->id == NULL) {
+        fprintf(stderr, "Error: Function declaration missing identifier\n");
+        return;
+    }
+
+    // Check parameters
+    if (node->left != NULL) {
+        // Analyze parameters (node->left should be the parameters node)
+        analyzeNode(node->left);
+    }
+
+    // Check return type
+    if (node->right != NULL) {
+        // Analyze return type (node->right should be the return type node)
+        analyzeNode(node->right);
+    }
+
+    // Check function body
+    if (node->statements.count > 0) {
+        for (int i = 0; i < node->statements.count; i++) {
+            analyzeNode(node->statements.stmts[i]);
+        }
+    }
+}
+
+void analyzeParameters(ASTNode* node) {
+    if (node == NULL) {
+        fprintf(stderr, "Error: NULL node in parameters analysis\n");
+        return;
+    }
+
+    // Check that the node is indeed a parameters node
+    if (node->type != NODE_TYPE_PARAMETERS) {
+        fprintf(stderr, "Error: Node is not a parameters node\n");
+        return;
+    }
+
+    // Iterate over each parameter and analyze it
+    for (int i = 0; i < node->parameters.count; i++) {
+        ASTNode* param = node->parameters.params[i];
+        if (param != NULL) {
+            analyzeNode(param);
+        } else {
+            fprintf(stderr, "Error: NULL parameter at index %d\n", i);
+        }
+    }
+}
+
+void analyzeParameter(ASTNode* node) {
+    if (node == NULL) {
+        fprintf(stderr, "Error: NULL node in parameter analysis\n");
+        return;
+    }
+
+    // Check that the node is indeed a parameter node
+    if (node->type != NODE_TYPE_PARAMETER) {
+        fprintf(stderr, "Error: Node is not a parameter node\n");
+        return;
+    }
+
+    // Check the parameter identifier
+    if (node->param.identifier == NULL || node->param.identifier->id == NULL) {
+        fprintf(stderr, "Error: Parameter missing identifier\n");
+        return;
+    }
+
+    // Check the parameter type
+    if (node->param.paramType == NULL || node->param.paramType->id == NULL) {
+        fprintf(stderr, "Error: Parameter missing type\n");
+        return;
+    }
+
+    // Additional checks can be added here as needed
+}
+
+void analyzeReturn(ASTNode* node) {
+    if (node == NULL) {
+        fprintf(stderr, "Error: NULL node in return analysis\n");
+        return;
+    }
+
+    // Check that the node is indeed a return node
+    if (node->type != NODE_TYPE_RETURN) {
+        fprintf(stderr, "Error: Node is not a return node\n");
+        return;
+    }
+
+    // Analyze the expression being returned
+    if (node->left != NULL) {
+        analyzeNode(node->left);
+    } else {
+        fprintf(stderr, "Error: Return statement missing expression\n");
+    }
+
+    // Additional checks can be added here as needed
+}
 
 void analyzeNode(ASTNode* node) {
     if (node == NULL) {
@@ -235,23 +342,28 @@ void analyzeNode(ASTNode* node) {
             analyzeIdentifier(node);
             break;
         case NODE_TYPE_NUMBER:
-            {
-                char* temp = newTemp();
-                char tac_line[100];
-                sprintf(tac_line, "%s = %d", temp, node->value);
-                generateTACLine(tac_line);
-                node->temp_var_name = temp;
-
-                int temp_var_index = getIdIndex(temp);
-                updateIdToTemp(temp, temp_var_index);
-
-            }
+            // Existing logic for numbers
             break;
+        case NODE_TYPE_FUNCTION_DECLARATION:
+            analyzeFunctionDeclaration(node);
+            break;
+        case NODE_TYPE_PARAMETERS:
+            analyzeParameters(node);
+            break;
+        case NODE_TYPE_PARAMETER:
+            analyzeParameter(node);
+            break;
+        case NODE_TYPE_RETURN:
+            analyzeReturn(node);
+            break;
+        // Add cases for other node types as needed
         default:
             fprintf(stderr, "Error: Unknown node type %d in semantic analysis\n", node->type);
             exit(1);
     }
 }
+
+
 
 void performSemanticAnalysis(ASTNode* root) {
     printf("DEBUG: Starting semantic analysis\n");
