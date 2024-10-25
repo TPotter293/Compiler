@@ -13,30 +13,40 @@ void init_symbol_table() {
 
 // Insert a new symbol
 void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, char* returnType) {
+    if (name == NULL || type == NULL) {
+        fprintf(stderr, "Error: NULL name or type passed to insert_symbol\n");
+        return;
+    }
+
     // Check for redeclaration
     if (lookup_symbol(name) != -1) {
         printf("Error: redeclaration of %s\n", name);
         return;
     }
-    
+
     // Insert new symbol
     symbol_table[symbol_count].name = strdup(name);
     symbol_table[symbol_count].type = strdup(type);
-    
+
     if (strcmp(type, "function") == 0) {
         symbol_table[symbol_count].functionInfo = malloc(sizeof(FunctionInfo));
         symbol_table[symbol_count].functionInfo->name = strdup(name);
-        symbol_table[symbol_count].functionInfo->returnType = strdup(returnType);
+        symbol_table[symbol_count].functionInfo->returnType = returnType ? strdup(returnType) : NULL;
         symbol_table[symbol_count].functionInfo->paramTypes = malloc(sizeof(char*) * paramCount);
         symbol_table[symbol_count].functionInfo->paramCount = paramCount;
-        
+
         for (int i = 0; i < paramCount; i++) {
-            symbol_table[symbol_count].functionInfo->paramTypes[i] = strdup(paramTypes[i]);
+            if (paramTypes[i] != NULL) {
+                symbol_table[symbol_count].functionInfo->paramTypes[i] = strdup(paramTypes[i]);
+            } else {
+                fprintf(stderr, "Error: NULL parameter type at index %d\n", i);
+                symbol_table[symbol_count].functionInfo->paramTypes[i] = NULL;
+            }
         }
     } else {
         symbol_table[symbol_count].functionInfo = NULL;
     }
-    
+
     symbol_count++;
 }
 
