@@ -32,10 +32,16 @@ void semanticError(const char *message) {
 char** extractParamTypes(ASTNode** params, int count) {
     char** types = malloc(count * sizeof(char*));
     for (int i = 0; i < count; i++) {
-        types[i] = strdup(params[i]->id);  // Assuming the type is stored in the 'id' field
+        if (params[i]->id != NULL) {
+            types[i] = strdup(params[i]->id);
+        } else {
+            fprintf(stderr, "Error: Parameter id is NULL at index %d\n", i);
+            types[i] = NULL; // Handle the NULL case appropriately
+        }
     }
     return types;
 }
+
 %}
 
 // Declare the union for storing various types, including ASTNode pointers
@@ -157,18 +163,61 @@ function_declaration:
         printf("DEBUG: Processing full function declaration for %s\n", $3);
 
         // Create the nodes for function declaration
+        printf("DEBUG: Creating function declaration for %s\n", $3);
         ASTNode* idNode = createIdentifierNode($3);
         ASTNode* returnTypeNode = createIdentifierNode($2);
+        printf("DEBUG: Created identifier and return type nodes\n");
+        printf("DEBUG: Parameter list node: %p\n", (void*)$5);
+        printf("DEBUG: Statements node: %p\n", (void*)$8);
 
         // Create function declaration node
         $$ = createFunctionDeclarationNode(idNode, $5, returnTypeNode, $8);
+        printf("DEBUG: createFunctionDeclarationNode returned: %p\n", (void*)$$);
+         if ($$ == NULL) {
+            yyerror("Failed to create function declaration node");
+            YYABORT;
+        }
+
+          printf("DEBUG: Function declaration node created successfully\n");
+        printf("DEBUG: Node type: %d\n", $$->type);
+        printf("DEBUG: Node id: %s\n", $$->id);
+        printf("DEBUG: Node left (parameters): %p\n", (void*)$$->left);
+        printf("DEBUG: Node right (return type): %p\n", (void*)$$->right);
+        printf("DEBUG: Node statements count: %d\n", $$->statements.count);
+        printf("Full function declaration parsed: %s\n", $3);
 
         // Extract and store parameter types
         char** paramTypes = extractParamTypes($5->parameters.params, $5->parameters.count);
         insert_symbol($3, "function", paramTypes, $5->parameters.count, $2);
         freeParamTypes(paramTypes, $5->parameters.count);
 
+        printf("DEBUG: Function declaration node created successfully\n");
         printf("Full function declaration parsed: %s\n", $3);
+
+
+        // Add the function declaration to the program's AST
+printf("DEBUG: About to add function declaration to AST\n");
+printf("DEBUG: Root node address: %p\n", (void*)root);
+        if (root == NULL) {
+            printf("DEBUG: Creating new program node as root\n");
+            ASTNode* stmtNode = createStatementsNode(&$$, 1);
+            root = createProgramNode(stmtNode);
+            printf("DEBUG: New program node created as root\n");
+        } else {
+            printf("DEBUG: Adding function to existing program node\n");
+            ASTNode* newStatements = createStatementsNode(&$$, 1);
+            root->statements.stmts = realloc(root->statements.stmts, 
+                                             (root->statements.count + 1) * sizeof(ASTNode*));
+            if (root->statements.stmts == NULL) {
+                yyerror("Memory allocation failed when adding function to program");
+                YYABORT;
+            }
+            root->statements.stmts[root->statements.count++] = newStatements->statements.stmts[0];
+            free(newStatements);
+            printf("DEBUG: Function added to existing program node\n");
+        }
+        printf("DEBUG: Function declaration added to AST\n");
+
     }
     | FUNCTION TYPE IDENTIFIER LPAREN parameter_list RPAREN SEMICOLON
     {
@@ -217,7 +266,10 @@ function_declaration:
     }
     | TYPE IDENTIFIER
     {
-        $$ = createParametersNode(createParameterNode(createIdentifierNode($1), createIdentifierNode($2)), 1);
+        ASTNode* paramNode = createParameterNode(createIdentifierNode($2), createIdentifierNode($1));
+        ASTNode** params = malloc(sizeof(ASTNode*));  // Allocate memory for one parameter
+        params[0] = paramNode;  // Assign the first parameter
+        $$ = createParametersNode(params, 1);  // Pass the array to createParametersNode
         free($1);
         free($2);
     }
