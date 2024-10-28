@@ -17,6 +17,7 @@ int lines = 0;
 %}
 
 %option noyywrap
+%option yylineno
 
 letter      [a-zA-Z]
 digit       [0-9]
@@ -52,6 +53,12 @@ ws          {delim}+
               }
 
 "char"       { words++; chars += strlen(yytext);
+                printf("%s : TYPE\n", yytext);
+                yylval.strval = strdup(yytext);
+                return TYPE;
+              }
+
+"void"       { words++; chars += strlen(yytext);
                 printf("%s : TYPE\n", yytext);
                 yylval.strval = strdup(yytext);
                 return TYPE;
@@ -154,6 +161,7 @@ ws          {delim}+
               }
 
 \n {lines++; chars = 0;}
+[ \t]+       { chars += yyleng; } // Count all whitespace characters
 
 %{
 	// Logical operators
