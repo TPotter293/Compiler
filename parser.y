@@ -9,8 +9,10 @@
 #include "code_generator.h"
 #include "parser.tab.h"
 
+
 extern int yylex();
 extern int yyparse();
+extern int yylineno;
 extern FILE* yyin;
 
 ASTNode* root = NULL; // Root of the AST
@@ -21,13 +23,27 @@ void yyerror(const char* s) {
     exit(1);
 }
 
+void syntaxError(const char *message) {
+    fprintf(stderr, "Syntax error: %s at line %d\n", message, yylineno);
+}
+
+void semanticError(const char *message) {
+    fprintf(stderr, "Semantic error: %s at line %d\n", message, yylineno);
+}
+
 char** extractParamTypes(ASTNode** params, int count) {
     char** types = malloc(count * sizeof(char*));
     for (int i = 0; i < count; i++) {
-        types[i] = strdup(params[i]->id);  // Assuming the type is stored in the 'id' field
+        if (params[i]->id != NULL) {
+            types[i] = strdup(params[i]->id);
+        } else {
+            fprintf(stderr, "Error: Parameter id is NULL at index %d\n", i);
+            types[i] = NULL; // Handle the NULL case appropriately
+        }
     }
     return types;
 }
+
 %}
 
 // Declare the union for storing various types, including ASTNode pointers
@@ -64,6 +80,7 @@ program:
         root = createProgramNode($1); // Assign root to the program node
         printf("Program parsed successfully!\n");
     }
+    | error {syntaxError("Invalid program structure"); YYABORT; }
     ;
 
 statements:
@@ -72,14 +89,14 @@ statements:
         $$ = $1;
         $$->statements.stmts = realloc($$->statements.stmts, ($$->statements.count + 1) * sizeof(ASTNode*));
         $$->statements.stmts[$$->statements.count++] = $2;
-        printf("DEBUG: Added statement to statements, now has %d statements\n", $$->statements.count);
     }
     | statement
     {
         $$ = createStatementsNode(&$1, 1);
-        printf("DEBUG: Created new statements node with 1 statement\n");
     }
+    | /* empty */ { $$ = createStatementsNode(NULL, 0); }
     ;
+
 
 statement:
     declaration
@@ -149,45 +166,102 @@ variable_declaration:
     ;
 
 function_declaration:
-    FUNCTION IDENTIFIER LPAREN parameter_list RPAREN TYPE LBRACE statements RBRACE
+
+    FUNCTION TYPE IDENTIFIER LPAREN parameter_list RPAREN LBRACE statements RBRACE
     {
-        $$ = createFunctionDeclarationNode(createIdentifierNode($2), $4, createIdentifierNode($6), $8);
-        printf("Function declaration: %s\n", $2);
+        printf("DEBUG: Processing full function declaration for %s\n", $3);
 
-        // Entering function scope
-        char* func_scope = strdup($2);  // Use the function name as the scope
+        // Create the nodes for function declaration
+        printf("DEBUG: Creating function declaration for %s\n", $3);
+        ASTNode* idNode = createIdentifierNode($3);
+        ASTNode* returnTypeNode = createIdentifierNode($2);
+        printf("DEBUG: Created identifier and return type nodes\n");
+        printf("DEBUG: Parameter list node: %p\n", (void*)$5);
+        printf("DEBUG: Statements node: %p\n", (void*)$8);
 
-        // Insert function itself into the symbol table with its return type
-        insert_symbol($2, $6, "global");
-        
-        // Insert each parameter into the symbol table with function scope
-        for (int i = 0; i < $4->parameters.count; i++) {
-            ASTNode* param = $4->parameters.params[i];
-            insert_symbol(param->id, (char *) typeToString(param->type), func_scope);
-            printf("Inserted parameter '%s' of type '%s' into symbol table for function '%s'\n", param->id, typeToString(param->type), func_scope);
+        // Create function declaration node
+        $$ = createFunctionDeclarationNode(idNode, $5, returnTypeNode, $8);
+        printf("DEBUG: createFunctionDeclarationNode returned: %p\n", (void*)$$);
+         if ($$ == NULL) {
+            yyerror("Failed to create function declaration node");
+            YYABORT;
         }
 
-        // Free allocated memory for function scope
-        free(func_scope);
+          printf("DEBUG: Function declaration node created successfully\n");
+        printf("DEBUG: Node type: %d\n", $$->type);
+        printf("DEBUG: Node id: %s\n", $$->id);
+        printf("DEBUG: Node left (parameters): %p\n", (void*)$$->left);
+        printf("DEBUG: Node right (return type): %p\n", (void*)$$->right);
+        printf("DEBUG: Node statements count: %d\n", $$->statements.count);
+        printf("Full function declaration parsed: %s\n", $3);
 
-        char** paramTypes = extractParamTypes($4->parameters.params, $4->parameters.count);
-        for (int i = 0; i < $4->parameters.count; i++) {
-            free(paramTypes[i]);
+        // Extract and store parameter types
+        char** paramTypes = extractParamTypes($5->parameters.params, $5->parameters.count);
+        insert_symbol($3, "function", paramTypes, $5->parameters.count, $2);
+        freeParamTypes(paramTypes, $5->parameters.count);
+
+        printf("DEBUG: Function declaration node created successfully\n");
+        printf("Full function declaration parsed: %s\n", $3);
+
+
+        // Add the function declaration to the program's AST
+printf("DEBUG: About to add function declaration to AST\n");
+printf("DEBUG: Root node address: %p\n", (void*)root);
+        if (root == NULL) {
+            printf("DEBUG: Creating new program node as root\n");
+            ASTNode* stmtNode = createStatementsNode(&$$, 1);
+            root = createProgramNode(stmtNode);
+            printf("DEBUG: New program node created as root\n");
+        } else {
+            printf("DEBUG: Adding function to existing program node\n");
+            ASTNode* newStatements = createStatementsNode(&$$, 1);
+            root->statements.stmts = realloc(root->statements.stmts, 
+                                             (root->statements.count + 1) * sizeof(ASTNode*));
+            if (root->statements.stmts == NULL) {
+                yyerror("Memory allocation failed when adding function to program");
+                YYABORT;
+            }
+            root->statements.stmts[root->statements.count++] = newStatements->statements.stmts[0];
+            free(newStatements);
+            printf("DEBUG: Function added to existing program node\n");
         }
-        free(paramTypes);
-        print_symbol_table();
+        printf("DEBUG: Function declaration added to AST\n");
 
-        free($2);
-        free($6);
+    }
+    | FUNCTION TYPE IDENTIFIER LPAREN parameter_list RPAREN SEMICOLON
+    {
+        printf("DEBUG: Processing function prototype for %s\n", $3);
+
+        // Create the nodes for function prototype
+        ASTNode* idNode = createIdentifierNode($3);
+        ASTNode* returnTypeNode = createIdentifierNode($2);
+
+        // Create function prototype node
+        $$ = createFunctionPrototypeNode(idNode, $5, returnTypeNode);
+
+        // Extract and store parameter types
+        char** paramTypes = extractParamTypes($5->parameters.params, $5->parameters.count);
+        insert_symbol($3, "function", paramTypes, $5->parameters.count, $2);
+        freeParamTypes(paramTypes, $5->parameters.count);
+
+        printf("Function prototype parsed: %s\n", $3);
     }
     ;
 
 
-parameter_list:
+
+
+
+
+
+
+
+    parameter_list:
+
     parameters
     | /* empty */
     {
-        $$ = NULL;
+        $$ = createParametersNode(NULL, 0); // Empty parameter list
     }
     ;
 
@@ -200,13 +274,17 @@ parameters:
         free($3);
         free($4);
     }
-    |  TYPE IDENTIFIER
+    | TYPE IDENTIFIER
     {
-        $$ = createParametersNode(createParameterNode(createIdentifierNode($1), createIdentifierNode($2)), 1);
+        ASTNode* paramNode = createParameterNode(createIdentifierNode($2), createIdentifierNode($1));
+        ASTNode** params = malloc(sizeof(ASTNode*));  // Allocate memory for one parameter
+        params[0] = paramNode;  // Assign the first parameter
+        $$ = createParametersNode(params, 1);  // Pass the array to createParametersNode
         free($1);
         free($2);
     }
     ;
+
 
 assignment:
     IDENTIFIER EQ expression SEMICOLON
@@ -333,8 +411,13 @@ int main(int argc, char** argv) {
     }
 
     printf("Starting parser...\n");
-    yyparse();
-    printf("Parsing completed.\n");
+    int parse_result = yyparse();
+    if (parse_result == 0) {
+        printf("Parsing completed successfully.\n");
+    } else {
+        printf("Parsing failed.\n");
+        return 1;
+    }
 
     // Print the AST
     printf("Abstract Syntax Tree (AST):\n");
