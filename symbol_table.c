@@ -19,7 +19,7 @@ void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, ch
     }
 
     // Check for redeclaration
-    if (lookup_symbol(name) != -1) {
+    if (lookup_symbol(name) != NULL) {
         printf("Error: redeclaration of %s\n", name);
         return;
     }
@@ -46,18 +46,19 @@ void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, ch
     } else {
         symbol_table[symbol_count].functionInfo = NULL;
     }
-
+    printf("DEBUG: Inserted symbol: %s, Type: %s\n", name, type);
     symbol_count++;
 }
 
 // Lookup a symbol by name
-int lookup_symbol(char *name) {
+Symbol* lookup_symbol(char *name) {
     for (int i = 0; i < symbol_count; i++) {
         if (strcmp(symbol_table[i].name, name) == 0) {
-            return i;  // Found, return index
+            printf("DEBUG: Found symbol: %s, Type: %s\n", name, symbol_table[i].type);
+            return &symbol_table[i];  // Found, return pointer to symbol
         }
     }
-    return -1;  // Not found
+    return NULL;  // Not found
 }
 
 // Print symbol table
@@ -84,7 +85,6 @@ void freeParamTypes(char** paramTypes, int count) {
     }
     free(paramTypes);
 }
-
 
 void clean_up_symbol_table() {
     for (int i = 0; i < symbol_count; i++) {
