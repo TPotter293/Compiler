@@ -7,7 +7,7 @@
 // Add this line
 void freeNode(ASTNode* node);
 void debugPrintFunctionNode(ASTNode* node);
-
+char* generateTempVariable();
 
 // Helper function to allocate a new node
 ASTNode* createNode() {
@@ -24,6 +24,7 @@ ASTNode* createNode() {
     node->value = 0;
     node->statements.count = 0;
     node->statements.stmts = NULL; // Initialize statements array
+    node->temp_var_name = NULL;
     return node;
 }
 
@@ -52,7 +53,6 @@ ASTNode* createStatementsNode(ASTNode** stmts, int count) {
     return node;
 }
 
-
 // Create a program node with statements
 ASTNode* createProgramNode(ASTNode* stmtList) {
     printf("DEBUG: Entering createProgramNode\n");
@@ -67,7 +67,6 @@ ASTNode* createProgramNode(ASTNode* stmtList) {
     printf("DEBUG: Exiting createProgramNode\n");
     return node;
 }
-
 
 // Create a declaration node with an identifier
 ASTNode* createDeclarationNode(ASTNode* type, ASTNode* id) {
@@ -147,6 +146,17 @@ ASTNode* createIdentifierNode(char* id) {
 }
 
 // Create binary operation node with its left and right children
+// Function to create a binary operation node
+
+// Function to generate a unique temporary variable name
+char* generateTempVariable() {
+    static int tempVarCounter = 0;
+    char* tempVarName = (char*)malloc(20); // Allocate space for the name
+    snprintf(tempVarName, 20, "t%d", tempVarCounter++); // Generate unique name
+    return tempVarName;
+}
+
+
 ASTNode* createBinaryOpNode(char* op, ASTNode* left, ASTNode* right) {
     printf("DEBUG: Creating binary op node with op '%s'\n", op ? op : "NULL");
     ASTNode* node = createNode();
@@ -156,7 +166,111 @@ ASTNode* createBinaryOpNode(char* op, ASTNode* left, ASTNode* right) {
     }
     node->left = left;  // Set left operand
     node->right = right; // Set right operand
+
+    // Generate a temporary variable for the result
+    node->temp_var_name = generateTempVariable();
+
+    // Log the temporary variable creation
+    printf("DEBUG: Temporary variable created for binary op: %s\n", node->temp_var_name);
+
     return node;
+}
+
+// Example usage in processing expressions
+void processExpression(ASTNode* node) {
+    if (!node) return;
+
+    switch (node->type) {
+        case NODE_TYPE_BINARY_OP:
+            processExpression(node->left);
+            processExpression(node->right);
+            // Generate TAC for binary operation
+            printf("TAC: %s = %s %s %s\n", 
+                   node->temp_var_name, 
+                   node->left->temp_var_name, 
+                   node->op, 
+                   node->right->temp_var_name);
+            break;
+
+        case NODE_TYPE_UNARY_OP:
+            processExpression(node->left); // Process the expression
+            // Generate TAC for unary operation
+            printf("TAC: %s = %s %s\n", 
+                   node->temp_var_name, 
+                   node->left->temp_var_name, 
+                   node->op); // Ensure op is set correctly
+            break;
+
+        case NODE_TYPE_NUMBER:
+            // Directly use the number value
+            node->temp_var_name = generateTempVariable();
+            printf("TAC: %s = %d\n", 
+                   node->temp_var_name, 
+                   node->value);
+            break;
+
+        case NODE_TYPE_IDENTIFIER:
+            // Use the identifier directly
+            node->temp_var_name = strdup(node->id); // No need for a temporary variable
+            break;
+
+        case NODE_TYPE_ASSIGNMENT:
+            processExpression(node->right); // Process the expression
+            printf("TAC: %s = %s\n", 
+                   node->left->id, // The identifier name
+                   node->right->temp_var_name);
+            break;
+
+        case NODE_TYPE_FUNCTION_CALL:
+            // Handle function call, assuming arguments are already processed
+            printf("TAC: CALL %s\n", node->id);
+            break;
+
+        default:
+            printf("DEBUG: Unknown expression type\n");
+            break;
+    }
+}
+
+void processFunctionCall(ASTNode* node) {
+    if (node->funcCall.arguments) {
+        processExpression(node->funcCall.arguments);
+    }
+    // Generate TAC for the function call
+    printf("TAC: CALL %s\n", node->id);
+}
+
+void processStatement(ASTNode* node) {
+    if (!node) return;
+
+    switch (node->type) {
+        case NODE_TYPE_WRITE:
+            processExpression(node->left);
+            printf("TAC: WRITE %s\n", node->left->temp_var_name);
+            break;
+
+        case NODE_TYPE_RETURN:
+            processExpression(node->left);
+            printf("TAC: RETURN %s\n", node->left->temp_var_name);
+            break;
+
+        default:
+            printf("DEBUG: Unknown statement type\n");
+            break;
+    }
+}
+
+void processAST(ASTNode* root) {
+    if (!root) return;
+
+    // Example for processing a program node
+    if (root->type == NODE_TYPE_PROGRAM) {
+        for (int i = 0; i < root->statements.count; i++) {
+            processStatement(root->statements.stmts[i]);
+        }
+    } else {
+        processExpression(root);
+    }
 }
 
 // Create a unary operation node
@@ -178,7 +292,7 @@ ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type) {
 
 // Function declaration node creation with body management
 ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType, ASTNode* body) {
-    printf("DEBUG: Entering createFunctionDeclarationNode\n");
+    printf("DEBUG: Creating function declaration node with body at %p\n", (void*)body);
     
     ASTNode* node = createNode();
     node->type = NODE_TYPE_FUNCTION_DECLARATION;
@@ -187,28 +301,21 @@ ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters,
     node->right = returnType;
     
     if (body && body->statements.count > 0) {
+        printf("DEBUG: Body has %d statements\n", body->statements.count);
         node->statements.count = body->statements.count;
-        node->statements.stmts = malloc(sizeof(ASTNode*) * node->statements.count);
+        node->statements.stmts = malloc(sizeof(ASTNode*) * body->statements.count);
         
-        // Deep copy each statement pointer
         for (int i = 0; i < body->statements.count; i++) {
+            printf("DEBUG: Copying statement %d from %p\n", i, (void*)body->statements.stmts[i]);
             node->statements.stmts[i] = body->statements.stmts[i];
-            printf("DEBUG: Copied statement %d from %p to new location\n", 
-                   i, (void*)body->statements.stmts[i]);
+            printf("DEBUG: Statement %d copied to %p\n", i, (void*)node->statements.stmts[i]);
         }
-        
-        // Don't free the body node here - it will be freed later
-        body->statements.stmts = NULL;
-        body->statements.count = 0;
     }
     
+    // Don't free the body node here - let the caller handle it
+    printf("DEBUG: Function declaration node creation complete\n");
     return node;
 }
-
-
-
-
-
 
 // Add a new function for debugging AST nodes
 void debugPrintNode(ASTNode* node, const char* message) {
@@ -230,10 +337,17 @@ void debugPrintFunctionNode(ASTNode* node) {
 
 // Create a parameter node
 ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type) {
+     if (identifier == NULL || type == NULL) {
+        fprintf(stderr, "Error: NULL identifier or type in parameter creation\n");
+        return NULL;
+    }
+   
     ASTNode* node = createNode();
     node->type = NODE_TYPE_PARAMETER;
     node->param.identifier = identifier;
     node->param.paramType = type;
+        printf("DEBUG: Created parameter node with identifier: %s, type: %s\n",
+           identifier->id, type->id);
     return node;
 }
 
@@ -252,6 +366,47 @@ ASTNode* createParametersNode(ASTNode** params, int count) {
         node->statements.stmts[i] = params[i];
     }
     return node;
+}
+
+// Create a function call node
+ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments) {
+    ASTNode* node = createNode();
+    node->type = NODE_TYPE_FUNCTION_CALL;
+    node->id = strdup(identifier);
+    node->funcCall.arguments = arguments;
+    return node;
+}
+
+// Create an argument list node
+ASTNode* createArgumentListNode(ASTNode** args, int count) {
+    ASTNode* node = createNode();
+    node->type = NODE_TYPE_ARGUMENT_LIST;
+    node->argumentList.count = count;
+    node->argumentList.args = malloc(sizeof(ASTNode*) * count);
+    if (node->argumentList.args == NULL) {
+        fprintf(stderr, "Memory allocation failed for argument list array\n");
+        free(node);
+        return NULL;
+    }
+    for (int i = 0; i < count; i++) {
+        node->argumentList.args[i] = args[i];
+    }
+    return node;
+}
+
+// Append an argument node to an existing list
+ASTNode* appendArgumentNode(ASTNode* list, ASTNode* arg) {
+    if (list->type != NODE_TYPE_ARGUMENT_LIST) {
+        fprintf(stderr, "Error: Node is not an argument list\n");
+        return NULL;
+    }
+    list->argumentList.args = realloc(list->argumentList.args, (list->argumentList.count + 1) * sizeof(ASTNode*));
+    if (list->argumentList.args == NULL) {
+        fprintf(stderr, "Memory allocation failed when appending argument\n");
+        return NULL;
+    }
+    list->argumentList.args[list->argumentList.count++] = arg;
+    return list;
 }
 
 void printAST(ASTNode* node, int indentLevel) {
@@ -275,55 +430,47 @@ void printAST(ASTNode* node, int indentLevel) {
     if (node->right) printAST(node->right, indentLevel + 1);
 }
 
+// Function to free the identifier string in an AST node
+void freeIdentifier(ASTNode* node) {
+    if (node->type == NODE_TYPE_IDENTIFIER && node->id != NULL) {
+        free(node->id);
+        node->id = NULL;
+    }
+}
+
 void freeNode(ASTNode* node) {
     if (!node) return;
 
-    printf("DEBUG: Starting to free node of type %d at %p\n", node->type, (void*)node);
-
-    // Free child nodes first
+    // Free child nodes
     if (node->left) {
-        printf("DEBUG: Freeing left child at %p\n", (void*)node->left);
         freeNode(node->left);
         node->left = NULL;
     }
     
     if (node->right) {
-        printf("DEBUG: Freeing right child at %p\n", (void*)node->right);
         freeNode(node->right);
         node->right = NULL;
     }
 
-    // Free statements array if it exists
+    // Free statements
     if (node->statements.stmts) {
-        printf("DEBUG: Freeing statements of node\n");
         for (int i = 0; i < node->statements.count; i++) {
             if (node->statements.stmts[i]) {
-                printf("DEBUG: Freeing statement %d at %p\n", i, (void*)node->statements.stmts[i]);
                 freeNode(node->statements.stmts[i]);
-                node->statements.stmts[i] = NULL;
             }
         }
         free(node->statements.stmts);
         node->statements.stmts = NULL;
     }
 
-    // Free string members
-    if (node->id) {
-        printf("DEBUG: Freeing node id: %s\n", node->id);
-        free(node->id);
-        node->id = NULL;
-    }
+    // Free the identifier string if applicable
+    freeIdentifier(node);
+
+    // Free other string members
+    if (node->op) free(node->op);
     
-    if (node->op) {
-        printf("DEBUG: Freeing node op: %s\n", node->op);
-        free(node->op);
-        node->op = NULL;
-    }
-
     free(node);
-    printf("DEBUG: Freed node at %p\n", (void*)node);
 }
-
 
 void freeAST(ASTNode* root) {
     if (!root) return;
@@ -353,5 +500,3 @@ void freeAST(ASTNode* root) {
     printf("DEBUG: Freeing node %p with type %d\n", (void*)root, root->type);
     freeNode(root);
 }
-
-
