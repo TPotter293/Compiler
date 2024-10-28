@@ -7,12 +7,14 @@
 #include "AST.h"
 #include "optimizer.h"
 #include "code_generator.h"
+#include "parser.tab.h"
 
 extern int yylex();
 extern int yyparse();
 extern FILE* yyin;
 
 ASTNode* root = NULL; // Root of the AST
+char* current_scope = "global"; // Global variable to track the current scope
 
 void yyerror(const char* s) {
     fprintf(stderr, "Parse error: %s\n", s);
@@ -30,14 +32,16 @@ char** extractParamTypes(ASTNode** params, int count) {
 
 // Declare the union for storing various types, including ASTNode pointers
 %union {
-    int intval;        // For numbers
+    int intval;        // For int
+    float floatval;    // For float
     char* strval;      // For identifiers, types, etc.
     struct ASTNode* node;     // For AST nodes
 }
 
 %token WRITE IF ELSE RETURN FUNCTION VAR
-%token <intval> NUMBER
-%token <strval> TYPE IDENTIFIER
+%token <intval> INT 
+%token <floatval> FLOAT
+%token <strval> TYPE IDENTIFIER BOOLVAL
 %token <char> SEMICOLON EQ PLUS MINUS MULT DIVIDE
 %token <char> NOT LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE COMMA
 
@@ -76,7 +80,6 @@ statements:
         printf("DEBUG: Created new statements node with 1 statement\n");
     }
     ;
-
 
 statement:
     declaration
@@ -121,43 +124,66 @@ declaration:
     {
         $$ = createDeclarationNode(createIdentifierNode($1), createIdentifierNode($2));
         printf("Declaration of variable '%s' of type '%s'.\n", $2, $1);
-        insert_symbol($2, $1, NULL, 0, NULL);
+        insert_symbol($2, $1, current_scope);
         print_symbol_table();
-        free($1);
-        free($2);
+    }
+    | TYPE LBRACKET INT RBRACKET IDENTIFIER SEMICOLON
+    {
+        printf("Array declaration of '%s' with size %d of type '%s'.\n", $5, $3, $1);
+        $$ = createArrayDeclarationNode(createIdentifierNode($5), $1, $3);
+        insert_array_symbol($5, $1, $3, current_scope); // Insert into symbol table
+        print_symbol_table();
     }
     ;
 
-    variable_declaration:
+variable_declaration:
     VAR IDENTIFIER TYPE SEMICOLON
     {
         $$ = createVariableDeclarationNode(createIdentifierNode($2), createIdentifierNode($3));
-        printf("Variable declaration: %s of type %s\n", $2, $3);
-        insert_symbol($2, $3, NULL, 0, NULL);
+        printf("Variable declaration: %s of type %s in scope '%s'\n", $2, $3, current_scope);
+        insert_symbol($2, $3, current_scope); // Use current_scope
         print_symbol_table();
         free($2);
         free($3);
     }
     ;
 
-    function_declaration:
+function_declaration:
     FUNCTION IDENTIFIER LPAREN parameter_list RPAREN TYPE LBRACE statements RBRACE
     {
         $$ = createFunctionDeclarationNode(createIdentifierNode($2), $4, createIdentifierNode($6), $8);
         printf("Function declaration: %s\n", $2);
+
+        // Entering function scope
+        char* func_scope = strdup($2);  // Use the function name as the scope
+
+        // Insert function itself into the symbol table with its return type
+        insert_symbol($2, $6, "global");
+        
+        // Insert each parameter into the symbol table with function scope
+        for (int i = 0; i < $4->parameters.count; i++) {
+            ASTNode* param = $4->parameters.params[i];
+            insert_symbol(param->id, (char *) typeToString(param->type), func_scope);
+            printf("Inserted parameter '%s' of type '%s' into symbol table for function '%s'\n", param->id, typeToString(param->type), func_scope);
+        }
+
+        // Free allocated memory for function scope
+        free(func_scope);
+
         char** paramTypes = extractParamTypes($4->parameters.params, $4->parameters.count);
-        insert_symbol($2, "function", paramTypes, $4->parameters.count, $6);
         for (int i = 0; i < $4->parameters.count; i++) {
             free(paramTypes[i]);
         }
         free(paramTypes);
         print_symbol_table();
+
         free($2);
         free($6);
     }
     ;
 
-    parameter_list:
+
+parameter_list:
     parameters
     | /* empty */
     {
@@ -165,7 +191,7 @@ declaration:
     }
     ;
 
-    parameters:
+parameters:
     parameters COMMA TYPE IDENTIFIER
     {
         $$ = $1;
@@ -182,15 +208,20 @@ declaration:
     }
     ;
 
-
 assignment:
     IDENTIFIER EQ expression SEMICOLON
     {
         $$ = createAssignmentNode(createIdentifierNode($1), $3);
-        printf("Assignment to variable '%s'.\n", $1);
+        printf("Assignment to variable '%s' in scope '%s'.\n", $1, current_scope);
         free($1);
     }
+    | IDENTIFIER LBRACKET expression RBRACKET EQ expression SEMICOLON
+    {
+        $$ = createArrayAssignmentNode($1, $3, $6);
+        printf("Array Assignment: %s[%s] = %s.\n", $1, $3, $6);
+    }
     ;
+
 
 write_statement:
     WRITE expression SEMICOLON
@@ -222,15 +253,26 @@ return_statement:
     ;
 
 expression:
-    NUMBER
+    INT 
     {
-        $$ = createNumberNode($1);
-        printf("Number expression: %d\n", $1);
+        $$ = createIntegerNode($1);
+        printf("Integer expression: %d\n", $1);
+    }
+    | FLOAT 
+    {
+        $$ = createFloatNode($1);
+        printf("Float expression: %f\n", $1);
     }
     | IDENTIFIER
     {
         $$ = createIdentifierNode($1);
         printf("Identifier expression: %s\n", $1);
+        free($1);
+    }
+    | BOOLVAL
+    {
+        $$ = createBooleanNode($1);
+        printf("Boolean expression: %s\n", $1);
         free($1);
     }
     | expression PLUS expression
@@ -270,8 +312,13 @@ expression:
     }
     | LPAREN expression RPAREN
     {
-        $$ = $2;
+        // $$ = $2;
         printf("Parenthesized expression parsed.\n");
+    }
+    | IDENTIFIER LBRACKET INT RBRACKET
+    {
+        $$ = createArrayAccessNode($1, $3);
+        printf("Array access: %s[%s].\n", $1, $3);
     }
     ;
 
@@ -304,15 +351,16 @@ int main(int argc, char** argv) {
     // Generate MIPS code
 
     FILE* output_file = fopen("output.asm", "w");
-if (output_file == NULL) {
-    fprintf(stderr, "Error opening output file\n");
-    return 1;
-}
+    if (output_file == NULL) {
+        fprintf(stderr, "Error opening output file\n");
+        return 1;
+    }
     generateCode("optimized.tac", output_file);
 
     fclose(output_file);
 
     // Print or traverse the AST here if needed
     clean_up_symbol_table();
+    freeASTNode(root);
     return 0;
 }
