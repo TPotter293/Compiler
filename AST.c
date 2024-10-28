@@ -3,18 +3,68 @@
 #include <string.h>
 #include "AST.h"
 
+const char* typeToString(NodeType type) {
+    switch (type) {
+        case NODE_TYPE_PROGRAM: return "program";
+        case NODE_TYPE_STATEMENT: return "statement";
+        case NODE_TYPE_DECLARATION: return "declaration";
+        case NODE_TYPE_ASSIGNMENT: return "assignment";
+        case NODE_TYPE_WRITE: return "write";
+        case NODE_TYPE_IF: return "if";
+        case NODE_TYPE_RETURN: return "return";
+        case NODE_TYPE_INTEGER: return "int";
+        case NODE_TYPE_FLOAT: return "float";
+        case NODE_TYPE_IDENTIFIER: return "identifier";
+        case NODE_TYPE_BOOLEAN: return "boolean";
+        case NODE_TYPE_BINARY_OP: return "binary operation";
+        case NODE_TYPE_UNARY_OP: return "unary operation";
+        case NODE_TYPE_VARIABLE_DECLARATION: return "variable declaration";
+        case NODE_TYPE_FUNCTION_DECLARATION: return "function declaration";
+        case NODE_TYPE_PARAMETER: return "parameter";
+        case NODE_TYPE_PARAMETERS: return "parameters";
+        case NODE_TYPE_ARRAY_DECLARATION: return "array declaration";
+        case NODE_TYPE_ARRAY_ACCESS: return "array access";
+        case NODE_TYPE_ARRAY_ASSIGNMENT: return "array assignment";
+        default: return "unknown";
+    }
+}
+
 // Helper function to allocate a new node
 ASTNode* createNode() {
     ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
-    node->left = NULL;
-    node->right = NULL;
-    node->op = NULL;
-    node->id = NULL;
-    node->value = 0;
-    node->statements.count = 0;
-    node->statements.stmts = NULL; // Initialize statements array
+    if (node == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return NULL;
+    }
+    
+    // Initialize all fields
+    node->type = NODE_TYPE_UNDEFINED; // Set to a default or undefined value
+    node->op = NULL;                   // Initialize operator to NULL
+    node->value.intValue = 0; 
+    node->value.floatValue = 0.0;                  // Set default value (could be another sentinel value)
+    node->id = NULL;                   // Initialize identifier to NULL
+    node->left = NULL;                 // Initialize left child
+    node->right = NULL;                // Initialize right child
+    node->temp_var = -1;               // Default for temp_var (indicate uninitialized)
+    node->temp_var_name = NULL;        // Initialize temporary variable name to NULL
+    node->boolean_val = NULL;          // Initialize boolean value to NULL
+    node->arrayIndex = NULL;           // Initialize array index to NULL
+    node->assignedValue = NULL;        // Initialize assigned value to NULL
+
+    // Initialize union fields appropriately
+    node->statements.count = 0;        // Initialize statement count
+    node->varDecl.arraySize = 0;       // Default array size
+    node->parameters.count = 0;        // Initialize parameter count
+    node->funcDecl.identifier = NULL;  // Initialize funcDecl fields to NULL
+    node->funcDecl.parameters = NULL;
+    node->funcDecl.returnType = NULL;
+    node->funcDecl.body = NULL;
+    node->param.identifier = NULL;      // Initialize param fields to NULL
+    node->param.paramType = NULL;
+
     return node;
 }
+
 
 // Create a node for statements
 ASTNode* createStatementsNode(ASTNode** stmts, int count) {
@@ -42,7 +92,7 @@ ASTNode* createProgramNode(ASTNode* stmtList) {
 ASTNode* createDeclarationNode(ASTNode* type, ASTNode* id) {
     ASTNode* node = createNode();
     node->type = NODE_TYPE_DECLARATION; // Set node type
-    node->left = type;  // Type goes to left child
+    node->left = type;  // Type goes to left child 
     node->right = id;   // Identifier goes to right child
     return node;
 }
@@ -83,10 +133,17 @@ ASTNode* createReturnNode(ASTNode* expr) {
 }
 
 // Create a number node
-ASTNode* createNumberNode(int value) {
+ASTNode* createIntegerNode(int value) {
     ASTNode* node = createNode();
-    node->type = NODE_TYPE_NUMBER; // Set node type
-    node->value = value;
+    node->type = NODE_TYPE_INTEGER; // Set node type
+    node->value.intValue = value;
+    return node;
+}
+
+ASTNode* createFloatNode(float value) {
+    ASTNode* node = createNode();
+    node->type = NODE_TYPE_FLOAT; // Set node type
+    node->value.floatValue = value; // Store float value
     return node;
 }
 
@@ -95,6 +152,14 @@ ASTNode* createIdentifierNode(char* id) {
     ASTNode* node = createNode();
     node->type = NODE_TYPE_IDENTIFIER; // Set node type
     node->id = strdup(id);  // Duplicate string
+    return node;
+}
+
+// Create boolean node
+ASTNode* createBooleanNode(char* value) {
+    ASTNode* node = createNode();
+    node->type = NODE_TYPE_BOOLEAN;  // Set node type to boolean
+    node->boolean_val = strdup(value);  // Store boolean value as a string
     return node;
 }
 
@@ -120,7 +185,7 @@ ASTNode* createUnaryOpNode(ASTNode* expr) {
 }
 
 ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type) {
-    ASTNode* node = malloc(sizeof(ASTNode));
+    ASTNode* node = createNode();
     node->type = NODE_TYPE_VARIABLE_DECLARATION;
     node->varDecl.identifier = identifier;
     node->varDecl.varType = type;
@@ -128,7 +193,7 @@ ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type) {
 }
 
 ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType, ASTNode* body) {
-    ASTNode* node = malloc(sizeof(ASTNode));
+    ASTNode* node = createNode();
     node->type = NODE_TYPE_FUNCTION_DECLARATION;
     node->funcDecl.identifier = identifier;
     node->funcDecl.parameters = parameters;
@@ -138,7 +203,7 @@ ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters,
 }
 
 ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type) {
-    ASTNode* node = malloc(sizeof(ASTNode));
+    ASTNode* node = createNode();
     node->type = NODE_TYPE_PARAMETER;
     node->param.identifier = identifier;
     node->param.paramType = type;
@@ -146,7 +211,7 @@ ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type) {
 }
 
 ASTNode* createParametersNode(ASTNode* parameter, int count) {
-    ASTNode* node = malloc(sizeof(ASTNode));
+    ASTNode* node = createNode();
     node->type = NODE_TYPE_PARAMETERS;
     node->parameters.params = malloc(sizeof(ASTNode*) * count);
     node->parameters.params[0] = parameter;
@@ -154,6 +219,33 @@ ASTNode* createParametersNode(ASTNode* parameter, int count) {
     return node;
 }
 
+ASTNode* createArrayDeclarationNode(ASTNode* identifier, char* typeNode, int arraySize) {
+    ASTNode* node = createNode();
+    node->type = NODE_TYPE_ARRAY_DECLARATION;
+    node->id = identifier;        // Identifier (variable name)
+    node->varDecl.varType = typeNode;     // Type (int, float, etc.)
+    node->varDecl.arraySize = arraySize;  // Array size
+
+    return node;
+}
+
+ASTNode* createArrayAccessNode(ASTNode* identifier, ASTNode* indexNode) {
+    ASTNode* node = createNode(); 
+    node->type = NODE_TYPE_ARRAY_ACCESS;
+    node->id  = identifier;        // Identifier (array name)
+    node->value.intValue = indexNode;    // Index to access
+
+    return node;
+}
+
+ASTNode* createArrayAssignmentNode(char* id, ASTNode* index, ASTNode* value) {
+    ASTNode* node = createNode();  // Create a new node
+    node->type = NODE_TYPE_ARRAY_ASSIGNMENT;  // Set the node type
+    node->id = strdup(id);  // Store the identifier for the array
+    node->arrayIndex = index;  // Store the index expression
+    node->assignedValue = value;  // Store the value to assign
+    return node;  // Return the created node
+}
 
 // Recursive function to print the AST
 void printAST(ASTNode* node, int indentLevel) {
@@ -199,13 +291,21 @@ void printAST(ASTNode* node, int indentLevel) {
         case NODE_TYPE_RETURN:
             printf("DEBUG: Node type: Return\n");
             break;
-        case NODE_TYPE_NUMBER:
-            printf("DEBUG: Node type: Number\n");
-            printf("DEBUG: Number value: %d\n", node->value);
+        case NODE_TYPE_INTEGER:
+            printf("DEBUG: Node type: integer\n");
+            printf("DEBUG: Integer value: %d\n", node->value.intValue);
+            break;
+        case NODE_TYPE_FLOAT:
+            printf("DEBUG: Node type: Float\n");
+            printf("DEBUG: Float value: %f\n", node->value.floatValue);
             break;
         case NODE_TYPE_IDENTIFIER:
             printf("DEBUG: Node type: Identifier\n");
             printf("DEBUG: Identifier value: %s\n", node->id);
+            break;
+        case NODE_TYPE_BOOLEAN:  // Handle boolean nodes
+            printf("DEBUG: Node type: Boolean\n");
+            printf("DEBUG: Boolean value: %s\n", node->value.intValue ? "true" : "false");
             break;
         case NODE_TYPE_BINARY_OP:
             printf("DEBUG: Node type: Binary Operator\n");
@@ -213,6 +313,26 @@ void printAST(ASTNode* node, int indentLevel) {
             break;
         case NODE_TYPE_UNARY_OP:
             printf("DEBUG: Node type: Unary Operator\n");
+            break;
+        case NODE_TYPE_ARRAY_DECLARATION:
+            printf("DEBUG: Node type: Array Declaration\n");
+            printf("DEBUG: Identifier value: %s\n", node->id);
+            printf("DEBUG: Type: %s\n", node->varDecl.varType);
+            printf("DEBUG: Array size: %d\n", node->varDecl.arraySize);
+            break;
+        case NODE_TYPE_ARRAY_ASSIGNMENT:
+            printf("DEBUG: Node type: Array Assignment\n");
+            printf("DEBUG: Array identifier: %s\n", node->id);
+            printf("DEBUG: Index:\n");
+            printAST(node->arrayIndex, indentLevel + 1);
+            printf("DEBUG: Value to assign:\n");
+            printAST(node->assignedValue, indentLevel + 1);
+            break;
+        case NODE_TYPE_ARRAY_ACCESS:
+            printf("DEBUG: Node type: Array Access\n");
+            printf("DEBUG: Array identifier: %s\n", node->id);
+            printf("DEBUG: Index:\n");
+            printAST(node->arrayIndex, indentLevel + 1);
             break;
         default:
             printf("DEBUG: Node type is unknown or uninitialized\n");
@@ -235,4 +355,27 @@ void printAST(ASTNode* node, int indentLevel) {
     }
 
     printf("DEBUG: Finished processing node at indent level %d\n", indentLevel);
+}
+
+
+void freeASTNode(ASTNode* node) {
+    if (node == NULL) return;  // Base case: nothing to free
+
+    // Recursively free children
+    freeASTNode(node->left);
+    freeASTNode(node->right);
+    
+    // Free dynamically allocated fields
+    free(node->op);                 // Free operator string
+    free(node->id);                 // Free identifier string
+    free(node->temp_var_name);      // Free temporary variable name string
+    free(node->boolean_val);        // Free boolean value string
+    freeASTNode(node->arrayIndex);  // Free array index node
+    freeASTNode(node->assignedValue); // Free assigned value node
+
+    // Free union members if they point to dynamic memory
+    // (Since the union does not require explicit freeing if they are NULL, skip this)
+
+    // Free the node itself
+    free(node);
 }

@@ -3,6 +3,8 @@
 #include <string.h>
 #include "symbol_table.h"
 
+#define TABLE_SIZE 100
+
 Symbol symbol_table[TABLE_SIZE];
 int symbol_count = 0;
 
@@ -11,32 +13,40 @@ void init_symbol_table() {
     symbol_count = 0;
 }
 
-// Insert a new symbol
-void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, char* returnType) {
+// Insert a new symbol (non-array)
+void insert_symbol(char *name, char *type, char *scope) {
     // Check for redeclaration
     if (lookup_symbol(name) != -1) {
         printf("Error: redeclaration of %s\n", name);
         return;
     }
-    
+
     // Insert new symbol
     symbol_table[symbol_count].name = strdup(name);
     symbol_table[symbol_count].type = strdup(type);
-    
-    if (strcmp(type, "function") == 0) {
-        symbol_table[symbol_count].functionInfo = malloc(sizeof(FunctionInfo));
-        symbol_table[symbol_count].functionInfo->name = strdup(name);
-        symbol_table[symbol_count].functionInfo->returnType = strdup(returnType);
-        symbol_table[symbol_count].functionInfo->paramTypes = malloc(sizeof(char*) * paramCount);
-        symbol_table[symbol_count].functionInfo->paramCount = paramCount;
-        
-        for (int i = 0; i < paramCount; i++) {
-            symbol_table[symbol_count].functionInfo->paramTypes[i] = strdup(paramTypes[i]);
-        }
-    } else {
-        symbol_table[symbol_count].functionInfo = NULL;
+    symbol_table[symbol_count].scope = strdup(scope);
+    symbol_table[symbol_count].is_array = 0;  // Not an array
+    symbol_table[symbol_count].array_size = 0; // Not applicable
+
+    symbol_count++;
+}
+
+// Insert a new array symbol
+void insert_array_symbol(char *name, char *type, int size, char *scope) {
+
+    // Check for redeclaration
+    if (lookup_symbol(name) != -1) {
+        printf("Error: redeclaration of array %s\n", name);
+        return;
     }
-    
+
+    // Insert new array symbol
+    symbol_table[symbol_count].name = strdup(name);
+    symbol_table[symbol_count].type = strdup(type);
+    symbol_table[symbol_count].scope = strdup(scope);
+    symbol_table[symbol_count].is_array = 1;    // This is an array
+    symbol_table[symbol_count].array_size = size; // Size of the array, 0 for dynamic arrays
+
     symbol_count++;
 }
 
@@ -53,33 +63,20 @@ int lookup_symbol(char *name) {
 // Print symbol table
 void print_symbol_table() {
     printf("Symbol Table:\n");
-    printf("Index\tName\t\tType\t\tFunction Info\n");
-    printf("------------------------------------------------\n");
-    
+    printf("Index\tName\t\tType\t\tScope\t\tArray\t\tSize\n");
+    printf("----------------------------------------------------------------------------\n");
+
     for (int i = 0; i < symbol_count; i++) {
-        printf("%d\t%s\t\t%s", i, symbol_table[i].name, symbol_table[i].type);
-        if (symbol_table[i].functionInfo != NULL) {
-            printf("\t\tReturn: %s, Params: ", symbol_table[i].functionInfo->returnType);
-            for (int j = 0; j < symbol_table[i].functionInfo->paramCount; j++) {
-                printf("%s ", symbol_table[i].functionInfo->paramTypes[j]);
-            }
-        }
-        printf("\n");
+        printf("%d\t%s\t\t%s\t\t%s\t\t%s\t\t%d\n", i, symbol_table[i].name, symbol_table[i].type,
+               symbol_table[i].scope, symbol_table[i].is_array ? "Yes" : "No", symbol_table[i].array_size);
     }
 }
 
+// Clean up symbol table
 void clean_up_symbol_table() {
     for (int i = 0; i < symbol_count; i++) {
         free(symbol_table[i].name);
         free(symbol_table[i].type);
-        if (symbol_table[i].functionInfo != NULL) {
-            free(symbol_table[i].functionInfo->name);
-            free(symbol_table[i].functionInfo->returnType);
-            for (int j = 0; j < symbol_table[i].functionInfo->paramCount; j++) {
-                free(symbol_table[i].functionInfo->paramTypes[j]);
-            }
-            free(symbol_table[i].functionInfo->paramTypes);
-            free(symbol_table[i].functionInfo);
-        }
+        free(symbol_table[i].scope);
     }
 }

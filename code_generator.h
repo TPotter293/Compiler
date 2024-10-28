@@ -18,7 +18,8 @@ void generateWriteCode(const char* arg, FILE* output_file);
 void generateBinaryOpCode(TACInstruction* instr, FILE* output_file);
 
 int is_number_cg(const char* str);
-void allocateVariable(const char* identifier);
+int is_float(const char* str);
+void allocateVariable(const char* identifier, int is_float);
 int getVariableLocation(const char* identifier);
 void freeCodeGenSymbolTable();
 
