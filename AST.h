@@ -16,9 +16,11 @@ typedef enum {
     NODE_TYPE_UNARY_OP,
     NODE_TYPE_VARIABLE_DECLARATION,
     NODE_TYPE_FUNCTION_DECLARATION,
-    NODE_TYPE_FUNCTION_PROTOTYPE,  // Add this for function prototypes
+    NODE_TYPE_FUNCTION_PROTOTYPE,
     NODE_TYPE_PARAMETER,
     NODE_TYPE_PARAMETERS,
+    NODE_TYPE_FUNCTION_CALL,      // Added for function calls
+    NODE_TYPE_ARGUMENT_LIST       // Added for argument lists
 } NodeType;
 
 // ASTNode structure for representing AST nodes
@@ -34,7 +36,7 @@ typedef struct ASTNode {
     union {
         struct {
             struct ASTNode** stmts;  // Array of statements
-            int count;                // Count of statements
+            int count;               // Count of statements
         } statements;
         struct {
             struct ASTNode* identifier;  // Identifier (for declarations, assignments)
@@ -50,7 +52,7 @@ typedef struct ASTNode {
             struct ASTNode* identifier;  // Function identifier (for prototype)
             struct ASTNode* parameters;  // Function parameters
             struct ASTNode* returnType;  // Function return type
-        } funcProto;  // Function prototype
+        } funcProto;
         struct {
             struct ASTNode* identifier;  // Parameter identifier (e.g., variable name)
             struct ASTNode* paramType;   // Parameter type (e.g., int, float)
@@ -59,6 +61,14 @@ typedef struct ASTNode {
             struct ASTNode** params;  // Array of parameters
             int count;                // Count of parameters
         } parameters;
+        struct {
+            struct ASTNode* functionName;  // Function name for calls
+            struct ASTNode* arguments;     // Arguments for the function call
+        } funcCall;  // Added for function calls
+        struct {
+            struct ASTNode** args;  // Array of arguments
+            int count;              // Count of arguments
+        } argumentList;  // Added for argument lists
     };
 } ASTNode;
 
@@ -75,14 +85,19 @@ ASTNode* createBinaryOpNode(char* op, ASTNode* left, ASTNode* right);
 ASTNode* createUnaryOpNode(ASTNode* expr);
 ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type);
 ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType, ASTNode* body);
-ASTNode* createFunctionPrototypeNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType);  // Adjusted for function prototypes
+ASTNode* createFunctionPrototypeNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType);
 ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type);
-ASTNode* createParametersNode(ASTNode* parameter, int count);
-
-// Function for creating a statement node
+ASTNode* createParametersNode(ASTNode** params, int count);
 ASTNode* createStatementsNode(ASTNode** stmts, int count);
+ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments);  // Added for function calls
+ASTNode* createArgumentListNode(ASTNode** args, int count);  // Added for argument lists
+ASTNode* appendArgumentNode(ASTNode* list, ASTNode* arg);  // Added for appending arguments
 
-// Function for printing the AST
+// Function for printing the AST (ensure this is implemented in AST.c)
 void printAST(ASTNode* node, int indentLevel);
+
+// In AST.h or another appropriate header file
+char** extractParamTypes(ASTNode** params, int count);
+
 
 #endif  // AST_H
