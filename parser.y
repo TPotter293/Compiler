@@ -57,7 +57,7 @@ char** extractParamTypes(ASTNode** params, int count) {
 %token <char> SEMICOLON EQ PLUS MINUS MULT DIVIDE
 %token <char> NOT LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE COMMA
 
-%type <node> program statements statement expression declaration assignment write_statement if_statement return_statement function_declaration variable_declaration parameter_list parameters
+%type <node> program statements statement expression declaration assignment write_statement if_statement return_statement function_declaration variable_declaration parameter_list parameters argument_list
 
 %left OR
 %left AND
@@ -327,6 +327,12 @@ expression:
         printf("Identifier expression: %s\n", $1);
         free($1);
     }
+    | IDENTIFIER LPAREN argument_list RPAREN
+    {
+        $$ = createFunctionCallNode($1, $3);
+        printf("Function call expression: %s\n", $1);
+        free($1);
+    }
     | expression PLUS expression
     {
         $$ = createBinaryOpNode("+", $1, $3);
@@ -366,6 +372,21 @@ expression:
     {
         $$ = $2;
         printf("Parenthesized expression parsed.\n");
+    }
+    ;
+
+    argument_list:
+    /* empty */
+    {
+        $$ = createArgumentListNode(NULL, 0);
+    }
+    | expression
+    {
+        $$ = createArgumentListNode(&$1, 1);
+    }
+    | argument_list COMMA expression
+    {
+        $$ = appendArgumentNode($1, $3);
     }
     ;
 
