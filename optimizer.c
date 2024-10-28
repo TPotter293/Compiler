@@ -92,9 +92,6 @@ void constant_folding(TACInstruction* instructions, int* num_instructions) {
 
 
 
-
-
-
 void algebraic_simplification(TACInstruction* instructions, int* num_instructions) {
     for (int i = 0; i < *num_instructions; i++) {
         if (strcmp(instructions[i].op, "+") == 0 || strcmp(instructions[i].op, "-") == 0) {

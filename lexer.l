@@ -23,7 +23,9 @@ letter      [a-zA-Z]
 digit       [0-9]
 ID          {letter}({letter}|{digit})*
 delim       [ \t\n]
-NUMBER      {digit}+(\.{digit}+)?(E[+\-]?(digit)+)?
+INT         {digit}+
+FLOAT       {digit}+(\.{digit}+)?(E[+\-]?(digit)+)?
+NUMBER      {INT}|{FLOAT}
 ws          {delim}+
 
 %%
@@ -58,13 +60,39 @@ ws          {delim}+
                 return TYPE;
               }
 
-"void"       { words++; chars += strlen(yytext);
+"void"       { words++; chars += strlen(yytext); 
+              printf("%s : TYPE\n", yytext);
+                yylval.strval = strdup(yytext);
+                return TYPE;
+              } 
+              
+
+"float"       { words++; chars += strlen(yytext);
                 printf("%s : TYPE\n", yytext);
                 yylval.strval = strdup(yytext);
                 return TYPE;
               }
 
-"write"      { words++;
+
+"boolean"       { words++; chars += strlen(yytext);
+                printf("%s : TYPE\n", yytext);
+                yylval.strval = strdup(yytext);
+                return TYPE;
+              }
+
+"true"        { words++; chars += strlen(yytext);
+                printf("%s : BOOL VALUE\n", yytext);
+                yylval.strval = strdup(yytext);
+                return BOOLVAL;
+              }
+
+"false"       { words++; chars += strlen(yytext);
+                printf("%s : BOOL VALUE\n", yytext);
+                yylval.strval = strdup(yytext);
+                return BOOLVAL;
+              }
+
+"write"       { words++;
                 chars += strlen(yytext);
                 printf("%s : KEYWORD\n", yytext);
                 yylval.strval = strdup(yytext);
@@ -114,12 +142,21 @@ ws          {delim}+
               }
 
 %{
-	// Recognize numbers
+	// Recognize int
 %}
-{NUMBER}     { words++; chars += strlen(yytext);
-                printf("%s : NUMBER\n", yytext);
-                yylval.intval = atof(yytext);  // Convert to float or int as needed
-                return NUMBER;
+{INT}         { words++; chars += strlen(yytext);
+                printf("%s : INT\n", yytext);
+                yylval.intval = atoi(yytext);  
+                return INT;
+              }
+
+%{
+	// Recognize float
+%}
+{FLOAT}     { words++; chars += strlen(yytext);
+                printf("%s : FLOAT\n", yytext);
+                yylval.floatval = atof(yytext);  
+                return FLOAT;
               }
 
 %{
@@ -218,7 +255,7 @@ ws          {delim}+
 	// Handle newlines and whitespace
 %}
 \n           { lines++; chars = 0; }
-[ \t]+       { chars++; }
+[ \t]       { chars++; }
 
 %{
 	// Catch-all for unrecognized symbols	

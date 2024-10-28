@@ -20,6 +20,12 @@ char* newTemp() {
     return temp;
 }
 
+char* newFloat() {
+    char* temp = (char*)malloc(10);
+    sprintf(temp, "f%d", temp_var_count++);
+    return temp;
+}
+
 void generateTACLine(const char* tac_line) {
     fprintf(tac_file, "%s\n", tac_line);
 }
@@ -60,38 +66,56 @@ void generateTAC(ASTNode* node) {
             generateTACLine(tac_line);
             break;
         case NODE_TYPE_BINARY_OP:
-    // Generate TAC for left and right operands first
-        generateTAC(node->left);
-        generateTAC(node->right);
+            // Generate TAC for left and right operands first
+            generateTAC(node->left);
+            generateTAC(node->right);
 
-    // Check if both operands are constants
-            if (node->left->type == NODE_TYPE_NUMBER && node->right->type == NODE_TYPE_NUMBER) {
-        // Perform constant folding
+            char* temp;
+
+            // Check if both operands are constants
+            if (node->left->type == NODE_TYPE_INTEGER && node->right->type == NODE_TYPE_INTEGER) {
+                // Perform constant folding for integers
+                temp = newTemp();
                 int result = 0;
                 if (strcmp(node->op, "+") == 0) {
-            result = node->left->value + node->right->value;
+                    result = node->left->value.intValue + node->right->value.intValue;
                 } else if (strcmp(node->op, "-") == 0) {
-            result = node->left->value - node->right->value;
+                    result = node->left->value.intValue - node->right->value.intValue;
                 } else if (strcmp(node->op, "*") == 0) {
-            result = node->left->value * node->right->value;
+                    result = node->left->value.intValue * node->right->value.intValue;
                 } else if (strcmp(node->op, "/") == 0) {
-            result = node->left->value / node->right->value;
-        }
+                    result = node->left->value.intValue / node->right->value.intValue;
+                }
+                // Create a new temporary variable for the result
+                sprintf(tac_line, "%s = %d", temp, result);
+                printf("DEBUG: Constant Folding TAC -> %s\n", tac_line);
+                generateTACLine(tac_line);
+            } else if (node->left->type == NODE_TYPE_FLOAT && node->right->type == NODE_TYPE_FLOAT) {
+                // Perform constant folding for floats
+                temp = newFloat();
+                float result = 0.0f;
+                if (strcmp(node->op, "+") == 0) {
+                    result = node->left->value.floatValue + node->right->value.floatValue;
+                } else if (strcmp(node->op, "-") == 0) {
+                    result = node->left->value.floatValue - node->right->value.floatValue;
+                } else if (strcmp(node->op, "*") == 0) {
+                    result = node->left->value.floatValue * node->right->value.floatValue;
+                } else if (strcmp(node->op, "/") == 0) {
+                    result = node->left->value.floatValue / node->right->value.floatValue;
+                }
 
-        // Create a new temporary variable for the result
-        char* temp = newTemp();
-        sprintf(tac_line, "%s = %d", temp, result);
-        printf("DEBUG: Constant Folding TAC -> %s\n", tac_line);
-        generateTACLine(tac_line);
-        node->temp_var_name = temp;
+                // Create a new temporary variable for the result
+                sprintf(tac_line, "%s = %f", temp, result);
+                printf("DEBUG: Constant Folding TAC -> %s\n", tac_line);
+                generateTACLine(tac_line);
             } else {
+                temp = newFloat();
                 // Create a new temporary variable for the result of the binary operation
-                char* temp = newTemp();
                 sprintf(tac_line, "%s = %s %s %s", temp, node->left->temp_var_name, node->op, node->right->temp_var_name);
                 printf("DEBUG: Binary Operation TAC -> %s\n", tac_line);
                 generateTACLine(tac_line);
-                node->temp_var_name = temp; // Store temp variable for further use
             }
+            node->temp_var_name = temp; // Store temp variable for further use
             break;
         case NODE_TYPE_IDENTIFIER:
             // Check if the identifier has already been assigned a temp variable
@@ -104,12 +128,54 @@ void generateTAC(ASTNode* node) {
                 printf("DEBUG: Identifier '%s' assigned to temp variable %s\n", node->id, temp);
             }
             break;
-        case NODE_TYPE_NUMBER:
-            char* num_temp = newTemp();
-            sprintf(tac_line, "%s = %d", num_temp, node->value);
-            printf("DEBUG: Number -> %s\n", tac_line);
+        case NODE_TYPE_INTEGER:
+            char* int_temp = newTemp();
+            sprintf(tac_line, "%s = %d", int_temp, node->value.intValue);
+            printf("DEBUG: Integer -> %s\n", tac_line);
             generateTACLine(tac_line);
-            node->temp_var_name = num_temp; // Store the temp variable name for further use
+            node->temp_var_name = int_temp; // Store the temp variable name for further use
+            break;
+        case NODE_TYPE_FLOAT:
+            char* float_temp = newFloat();
+            sprintf(tac_line, "%s = %f", float_temp, node->value.floatValue);
+            printf("DEBUG: Float -> %s\n", tac_line);
+            generateTACLine(tac_line);
+            node->temp_var_name = float_temp;
+            break;
+        case NODE_TYPE_BOOLEAN:
+            char* bool_temp = newTemp();
+            sprintf(tac_line, "%s = %s", bool_temp, node->boolean_val);
+            printf("DEBUG: Boolean -> %s\n", tac_line);
+            generateTACLine(tac_line);
+            node->temp_var_name = bool_temp; 
+            break;
+        case NODE_TYPE_ARRAY_ACCESS: // Handle array access
+            // Assume node->array_id contains the array identifier and node->index contains the index expression
+            printf("------------------- index : %d -----------------\n", node->value.intValue);
+            generateTAC(node->value.intValue); // Generate TAC for the index
+            if (node->value.intValue != NULL) {
+                // Create a new temporary variable for accessing the array
+                char* temp = newTemp();
+                sprintf(tac_line, "%s = %s[%s]", temp, node->id, node->value.intValue);
+                printf("DEBUG: Array Access TAC -> %s\n", tac_line);
+                generateTACLine(tac_line);
+                node->temp_var_name = temp; // Store the temp variable for further use
+            } else {
+                fprintf(stderr, "Error: Index for array access does not produce a temp variable.\n");
+            }
+            break;
+        case NODE_TYPE_ARRAY_ASSIGNMENT: // Handle array assignments
+            // Assume node->array_id contains the array identifier and node->index contains the index expression
+            generateTAC(node->value.intValue); // Generate TAC for the index
+            generateTAC(node->right); // Generate TAC for the right-hand side (value to assign)
+
+            if (node->value.intValue != NULL && node->right->temp_var_name != NULL) {
+                sprintf(tac_line, "%s[%s] = %s", node->id, node->value.intValue, node->right->temp_var_name);
+                printf("DEBUG: Array Assignment TAC -> %s\n", tac_line);
+                generateTACLine(tac_line);
+            } else {
+                fprintf(stderr, "Error: Index or value for array assignment does not produce a temp variable.\n");
+            }
             break;
          case NODE_TYPE_FUNCTION_CALL:
              printf("DEBUG: Generating TAC for function call to '%s'\n", node->id);
@@ -288,6 +354,9 @@ void analyzeBinaryOp(ASTNode* node) {
     analyzeNode(node->left);
     analyzeNode(node->right);
 
+    char* temp = newFloat();
+    char tac_line[100];
+
     if (node->left->temp_var_name == NULL || node->right->temp_var_name == NULL) {
                 fprintf(stderr, "Error: Uninitialized variable in binary operation %s %s %s\n",
                 node->left->temp_var_name ? node->left->temp_var_name : "NULL",
@@ -307,7 +376,6 @@ void analyzeBinaryOp(ASTNode* node) {
     node->temp_var_name = temp;
     updateIdToTemp(temp, getIdIndex(temp));
 }
-
 
 
 void analyzeIdentifier(ASTNode* node) {
@@ -488,13 +556,57 @@ void analyzeArgumentList(ASTNode* node) {
             fprintf(stderr, "Error: Argument %d does not produce a temp variable.\n", i);
         }
     }
+
+void analyzeArrayDeclaration(ASTNode* node) {
+    // Array declarations don't output TAC but could be tracked in the symbol table
+    printf("DEBUG: Array declaration of %s with type %s and size %d\n", node->id, node->varDecl.varType, node->varDecl.arraySize);
+}
+
+void analyzeArrayAccess(ASTNode* node) {
+    // First, analyze the index expression to get the temp variable for the index
+    analyzeNode(node->value.intValue);
+
+    printf("----------------- index : %d ----------------------\n", node->value.intValue);
+
+    // Create a new temp variable to hold the accessed array value
+    char* temp = newTemp();
+    char tac_line[100];
+
+    // Generate TAC for array access: temp = array[index]
+    sprintf(tac_line, "%s = %s[%d]", temp, node->id, node->value.intValue);
+    generateTACLine(tac_line);
+
+    // Store the temp variable name for future use
+    node->temp_var_name = temp;
+
+    int temp_var_index = getIdIndex(temp);
+    updateIdToTemp(temp, temp_var_index);
+
+    printf("DEBUG: Array Access TAC -> %s\n", tac_line);
+}
+
+void analyzeArrayAssignment(ASTNode* node) {
+    // First, analyze the index and value expressions
+    analyzeNode(node->arrayIndex);
+    analyzeNode(node->assignedValue);
+
+    char tac_line[100];
+
+    // Generate TAC for array assignment: array[index] = value
+    sprintf(tac_line, "%s[%s] = %s", node->id, node->arrayIndex->temp_var_name, node->assignedValue->temp_var_name);
+    generateTACLine(tac_line);
+
+    printf("DEBUG: Array Assignment TAC -> %s\n", tac_line);
 }
 
 
 void analyzeNode(ASTNode* node) {
     if (node == NULL) {
-        return;
+        fprintf(stderr, "Error: NULL node passed to analyzeNode\n");
+        return; // Handle the error
     }
+
+    printf("DEBUG: analyzeNode node->type = %s\n", typeToString(node->type));
 
     switch (node->type) {
         case NODE_TYPE_PROGRAM:
@@ -544,8 +656,47 @@ void analyzeNode(ASTNode* node) {
         case NODE_TYPE_ARGUMENT_LIST:
             analyzeArgumentList(node);
             break;
+        case NODE_TYPE_INTEGER:
+            char* temp = newTemp();
+            char tac_line[100];
+            sprintf(tac_line, "%s = %d", temp, node->value.intValue);
+            generateTACLine(tac_line);
+            node->temp_var_name = temp;
 
-        // Add cases for other node types as needed
+            int temp_var_index = getIdIndex(temp);
+            updateIdToTemp(temp, temp_var_index);
+            break;
+        case NODE_TYPE_FLOAT:
+            char* temp2 = newFloat();
+            char tac_line2[100];
+            sprintf(tac_line2, "%s = %f", temp2, node->value.floatValue);
+            generateTACLine(tac_line2);
+            node->temp_var_name = temp2;
+
+            int temp_var_index2 = getIdIndex(temp2);
+            updateIdToTemp(temp2, temp_var_index2);
+            break;
+        case NODE_TYPE_BOOLEAN:
+            {
+                char* temp = newTemp();
+                char tac_line[100];
+                sprintf(tac_line, "%s = %s", temp, node->boolean_val);
+                generateTACLine(tac_line);
+                node->temp_var_name = temp;
+
+                int temp_var_index = getIdIndex(temp);
+                updateIdToTemp(temp, temp_var_index);
+            }
+            break;
+        case NODE_TYPE_ARRAY_DECLARATION:
+            analyzeArrayDeclaration(node);
+            break;
+        case NODE_TYPE_ARRAY_ACCESS:
+            analyzeArrayAccess(node);
+            break;
+        case NODE_TYPE_ARRAY_ASSIGNMENT:
+            analyzeArrayAssignment(node);
+            break;
         default:
             fprintf(stderr, "Error: Unknown node type %d in semantic analysis\n", node->type);
             exit(1);
@@ -556,7 +707,7 @@ void analyzeNode(ASTNode* node) {
 
 
 void performSemanticAnalysis(ASTNode* root) {
-    printf("DEBUG: Starting semantic analysis\n");
+    printf("-------------Starting semantic analysis--------------------------\n");
     init_symbol_table();
 
     tac_file = fopen("output.tac", "w");

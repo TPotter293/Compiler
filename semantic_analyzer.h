@@ -7,6 +7,7 @@
 void performSemanticAnalysis(ASTNode* root);
 
 char* newTemp();
+char* newFloat();
 
 // Function to write TAC to the file
 void generateTAC(const char* tac_line);
