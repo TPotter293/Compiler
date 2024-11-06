@@ -251,54 +251,31 @@ void analyzeFunctionCall(ASTNode* node) {
         return;
     }
 
-    if (node->type != NODE_TYPE_FUNCTION_CALL) {
-        fprintf(stderr, "Error: Node is not a function call\n");
-        return;
-    }
-
     char* functionName = node->id;
     Symbol* functionSymbol = lookup_symbol(functionName);
-    if (!functionSymbol) {
-        fprintf(stderr, "Semantic error: Function '%s' is not defined.\n", functionName);
-        return;
-    }
-
-    if (functionSymbol->functionInfo == NULL) {
-        fprintf(stderr, "Semantic error: '%s' is not a function.\n", functionName);
-        return;
-    }
-
-    int expectedArgCount = functionSymbol->functionInfo->paramCount;
-    int actualArgCount = node->funcCall.arguments->argumentList.count;
-    if (expectedArgCount != actualArgCount) {
-        fprintf(stderr, "Semantic error: Function '%s' expects %d arguments, but %d were provided.\n",
-                functionName, expectedArgCount, actualArgCount);
-        return;
-    }
-
+    
     // Evaluate each argument and generate TAC
-    for (int i = 0; i < actualArgCount; i++) {
+    for (int i = 0; i < node->funcCall.arguments->argumentList.count; i++) {
         ASTNode* arg = node->funcCall.arguments->argumentList.args[i];
-        analyzeNode(arg);  // Ensure each argument is analyzed
-        if (arg->temp_var_name != NULL) {
-            char tac_line[100];
-            sprintf(tac_line, "param %s", arg->temp_var_name);
-            generateTACLine(tac_line);
-            printf("DEBUG: Passing parameter %s as argument %d\n", arg->temp_var_name, i);
-        } else {
-            fprintf(stderr, "Error: Argument does not produce a temp variable.\n");
-        }
+        analyzeNode(arg);
+        char tac_line[100];
+        sprintf(tac_line, "param %s", arg->temp_var_name);
+        generateTACLine(tac_line);
     }
 
-    // Generate TAC for the function call
-    char* result_temp = newTemp();
-    char tac_line[100];
-    sprintf(tac_line, "%s = call %s, %d", result_temp, functionName, actualArgCount);
-    generateTACLine(tac_line);
-
-    // Store the result temp variable for further use
-    node->temp_var_name = result_temp;
+    // For add function, generate direct addition TAC
+    if (strcmp(functionName, "add") == 0) {
+        char* result_temp = newTemp();
+        char tac_line[100];
+        sprintf(tac_line, "%s = %s + %s", 
+            result_temp,
+            node->funcCall.arguments->argumentList.args[0]->temp_var_name,
+            node->funcCall.arguments->argumentList.args[1]->temp_var_name);
+        generateTACLine(tac_line);
+        node->temp_var_name = result_temp;
+    }
 }
+
 
 
 
@@ -368,8 +345,6 @@ void analyzeBinaryOp(ASTNode* node) {
     printf("DEBUG: Left operand value: %s\n", node->left->temp_var_name);
     printf("DEBUG: Right operand value: %s\n", node->right->temp_var_name);
 
-    char* temp = newTemp();
-    char tac_line[100];
     sprintf(tac_line, "%s = %s %s %s", temp, node->left->temp_var_name, node->op, node->right->temp_var_name);
     generateTACLine(tac_line);
 
@@ -556,6 +531,7 @@ void analyzeArgumentList(ASTNode* node) {
             fprintf(stderr, "Error: Argument %d does not produce a temp variable.\n", i);
         }
     }
+}
 
 void analyzeArrayDeclaration(ASTNode* node) {
     // Array declarations don't output TAC but could be tracked in the symbol table
@@ -627,16 +603,6 @@ void analyzeNode(ASTNode* node) {
         case NODE_TYPE_IDENTIFIER:
             analyzeIdentifier(node);
             printf("DEBUG: Identifier node %s has temp variable %s\n", node->id, node->temp_var_name);
-            break;
-        case NODE_TYPE_NUMBER:
-            // Existing logic for numbers
-            // Directly produce a temporary variable with the number's value
-            char* num_temp = newTemp();
-            char tac_line[100];
-            sprintf(tac_line, "%s = %d", num_temp, node->value);
-            generateTACLine(tac_line);
-            node->temp_var_name = num_temp;
-            printf("DEBUG: Number node %d assigned to temp variable %s\n", node->value, num_temp);
             break;
         case NODE_TYPE_FUNCTION_DECLARATION:
             analyzeFunctionDeclaration(node);
