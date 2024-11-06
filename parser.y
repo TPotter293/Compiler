@@ -16,6 +16,16 @@ extern int yyparse();
 extern int yylineno;
 extern FILE* yyin;
 
+struct symbol_table_entry {
+    char* name;
+    char* type;
+    char* value;
+    int is_array;
+    int array_size;
+    char* scope;
+};
+
+
 ASTNode* root = NULL; // Root of the AST
 char* current_scope = "global"; // Global variable to track the current scope
 
@@ -143,7 +153,7 @@ declaration:
     {
         $$ = createDeclarationNode(createIdentifierNode($1), createIdentifierNode($2));
         printf("Declaration of variable '%s' of type '%s'.\n", $2, $1);
-        insert_symbol($2, $1, current_scope);
+        insert_symbol($2, $1, "null", 0, "null");
         print_symbol_table();
     }
     | TYPE LBRACKET INT RBRACKET IDENTIFIER SEMICOLON
@@ -160,7 +170,7 @@ variable_declaration:
     {
         $$ = createVariableDeclarationNode(createIdentifierNode($2), createIdentifierNode($3));
         printf("Variable declaration: %s of type %s in scope '%s'\n", $2, $3, current_scope);
-        insert_symbol($2, $3, current_scope); // Use current_scope
+        insert_symbol($2, $3, "null", 0, "null"); // Use current_scope
         print_symbol_table();
         free($2);
         free($3);
@@ -271,19 +281,20 @@ parameters:
     {
         $$ = $1;
         $$->parameters.params = realloc($$->parameters.params, ($$->parameters.count + 1) * sizeof(ASTNode*));
-        $$->parameters.params[$$->parameters.count++] = createParameterNode(createIdentifierNode($3), createIdentifierNode($4));
+        $$->parameters.params[$$->parameters.count++] = createParameterNode(createIdentifierNode($4), createIdentifierNode($3));
         free($3);
         free($4);
     }
     | TYPE IDENTIFIER
     {
         ASTNode* paramNode = createParameterNode(createIdentifierNode($2), createIdentifierNode($1));
-        ASTNode** params = malloc(sizeof(ASTNode*));  // Allocate memory for one parameter
-        params[0] = paramNode;  // Assign the first parameter
-        $$ = createParametersNode(params, 1);  // Pass the array to createParametersNode
+        ASTNode** params = malloc(sizeof(ASTNode*));
+        params[0] = paramNode;
+        $$ = createParametersNode(params, 1);
         free($1);
         free($2);
     }
+
     ;
 
 
@@ -353,6 +364,7 @@ expression:
     {
         $$ = createFunctionCallNode($1, $3);
         printf("Function call expression: %s\n", $1);
+    }
     | BOOLVAL
     {
         $$ = createBooleanNode($1);
@@ -423,6 +435,102 @@ expression:
 
 %% 
 
+int lookupSymbolValue(char* id) {
+    struct symbol_table_entry* entry = lookup_symbol(id);
+    if (entry != NULL) {
+        return atoi(entry->value);
+    }
+    return 0;
+}
+
+
+
+int evaluateExpression(ASTNode* expr) {
+    if (!expr) return 0;
+    
+    switch(expr->type) {
+        case NODE_TYPE_INTEGER:
+            return expr->value.intValue;
+            
+        case NODE_TYPE_FUNCTION_CALL:
+            if (strcmp(expr->id, "add") == 0) {
+                int arg1 = evaluateExpression(expr->funcCall.arguments->argumentList.args[0]);
+                int arg2 = evaluateExpression(expr->funcCall.arguments->argumentList.args[1]);
+                return arg1 + arg2;
+            }
+            break;
+    }
+    return 0;
+}
+
+
+int executeFunctionCall(ASTNode* node) {
+    if (strcmp(node->id, "add") == 0) {
+        // Get the argument values
+        ASTNode* args = node->funcCall.arguments;
+        int arg1 = evaluateExpression(args->argumentList.args[0]);
+        int arg2 = evaluateExpression(args->argumentList.args[1]);
+        return arg1 + arg2;
+    }
+    return 0;
+}
+
+
+
+void executeStatement(ASTNode* stmt) {
+    if (!stmt) return;
+    
+    switch(stmt->type) {
+        case NODE_TYPE_DECLARATION:
+            printf("Executing declaration\n");
+            break;
+            
+        case NODE_TYPE_ASSIGNMENT: {
+            printf("Executing assignment\n");
+            if (stmt->left && stmt->left->id) {
+                int value = evaluateExpression(stmt->right);
+                char value_str[32];
+                snprintf(value_str, 32, "%d", value);
+                // Update symbol table with the new value
+                update_symbol_value(stmt->left->id, value_str);
+            }
+            break;
+        }
+        
+        case NODE_TYPE_WRITE:
+            printf("Executing write statement\n");
+            if (stmt->left && stmt->left->id) {
+                struct symbol_table_entry* entry = lookup_symbol(stmt->left->id);
+                if (entry && entry->value) {
+                    int value = atoi(entry->value);
+                    printf("Output: %d\n", value);
+                }
+            }
+            break;
+    }
+}
+
+
+void executeMain(ASTNode* root) {
+    if (!root) return;
+    
+    for (int i = 0; i < root->statements.count; i++) {
+        ASTNode* stmt = root->statements.stmts[i];
+        if (stmt->type == NODE_TYPE_FUNCTION_DECLARATION && 
+            stmt->id != NULL && 
+            strcmp(stmt->id, "main") == 0) {
+            printf("Executing main function...\n");
+            for (int j = 0; j < stmt->statements.count; j++) {
+                executeStatement(stmt->statements.stmts[j]);
+            }
+            return;
+        }
+    }
+    printf("Error: No main function found\n");
+}
+
+
+
 int main(int argc, char** argv) {
     if (argc > 1) {
         if (!(yyin = fopen(argv[1], "r"))) {
@@ -446,6 +554,9 @@ int main(int argc, char** argv) {
 
     // Perform semantic analysis
     performSemanticAnalysis(root);
+
+    // Execute main function
+    executeMain(root);
 
     // Optimize TAC
     printf("Optimizing TAC...\n");
