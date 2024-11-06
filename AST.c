@@ -262,13 +262,21 @@ void processExpression(ASTNode* node) {
                    node->op); // Ensure op is set correctly
             break;
 
-        case NODE_TYPE_NUMBER:
+       case NODE_TYPE_INTEGER:
             // Directly use the number value
             node->temp_var_name = generateTempVariable();
             printf("TAC: %s = %d\n", 
                    node->temp_var_name, 
                    node->value);
             break;
+        case NODE_TYPE_FLOAT:
+            // Directly use the number value
+            node->temp_var_name = generateTempVariable();
+            printf("TAC: %s = %d\n", 
+                   node->temp_var_name, 
+                   node->value);
+            break;
+            
 
         case NODE_TYPE_IDENTIFIER:
             // Use the identifier directly
@@ -282,10 +290,27 @@ void processExpression(ASTNode* node) {
                    node->right->temp_var_name);
             break;
 
-        case NODE_TYPE_FUNCTION_CALL:
-            // Handle function call, assuming arguments are already processed
-            printf("TAC: CALL %s\n", node->id);
-            break;
+      case NODE_TYPE_FUNCTION_CALL:
+    if (strcmp(node->id, "add") == 0) {
+        // Process arguments first
+        processExpression(node->funcCall.arguments->argumentList.args[0]);
+        processExpression(node->funcCall.arguments->argumentList.args[1]);
+        
+        // Generate TAC for function call with proper argument handling
+        printf("TAC: %s = %s(%s, %s)\n", 
+            node->temp_var_name,
+            node->id,
+            node->funcCall.arguments->argumentList.args[0]->temp_var_name,
+            node->funcCall.arguments->argumentList.args[1]->temp_var_name);
+        
+        // Generate addition operation
+        printf("TAC: %s = %s + %s\n",
+            node->temp_var_name,
+            node->funcCall.arguments->argumentList.args[0]->temp_var_name,
+            node->funcCall.arguments->argumentList.args[1]->temp_var_name);
+    }
+    break;
+
 
         default:
             printf("DEBUG: Unknown expression type\n");
@@ -437,6 +462,7 @@ ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments) {
     node->type = NODE_TYPE_FUNCTION_CALL;
     node->id = strdup(identifier);
     node->funcCall.arguments = arguments;
+    node->temp_var_name = generateTempVariable();
     return node;
 }
 
