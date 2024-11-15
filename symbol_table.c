@@ -13,10 +13,15 @@ void init_symbol_table() {
     symbol_count = 0;
 }
 
-// Insert a new symbol (non-array)
-void insert_symbol(char *name, char *type, char *scope) {
+// Insert a new symbol
+void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, char* returnType) {
+    if (name == NULL || type == NULL) {
+        fprintf(stderr, "Error: NULL name or type passed to insert_symbol\n");
+        return;
+    }
+
     // Check for redeclaration
-    if (lookup_symbol(name) != -1) {
+    if (lookup_symbol(name) != NULL) {
         printf("Error: redeclaration of %s\n", name);
         return;
     }
@@ -24,9 +29,26 @@ void insert_symbol(char *name, char *type, char *scope) {
     // Insert new symbol
     symbol_table[symbol_count].name = strdup(name);
     symbol_table[symbol_count].type = strdup(type);
-    symbol_table[symbol_count].scope = strdup(scope);
-    symbol_table[symbol_count].is_array = 0;  // Not an array
-    symbol_table[symbol_count].array_size = 0; // Not applicable
+
+    if (strcmp(type, "function") == 0) {
+        symbol_table[symbol_count].functionInfo = malloc(sizeof(FunctionInfo));
+        symbol_table[symbol_count].functionInfo->name = strdup(name);
+        symbol_table[symbol_count].functionInfo->returnType = returnType ? strdup(returnType) : NULL;
+        symbol_table[symbol_count].functionInfo->paramTypes = malloc(sizeof(char*) * paramCount);
+        symbol_table[symbol_count].functionInfo->paramCount = paramCount;
+
+        for (int i = 0; i < paramCount; i++) {
+            if (paramTypes[i] != NULL) {
+                symbol_table[symbol_count].functionInfo->paramTypes[i] = strdup(paramTypes[i]);
+            } else {
+                fprintf(stderr, "Error: NULL parameter type at index %d\n", i);
+                symbol_table[symbol_count].functionInfo->paramTypes[i] = NULL;
+            }
+        }
+    } else {
+        symbol_table[symbol_count].functionInfo = NULL;
+    }
+    printf("DEBUG: Inserted symbol: %s, Type: %s\n", name, type);
 
     symbol_count++;
 }
@@ -51,13 +73,14 @@ void insert_array_symbol(char *name, char *type, int size, char *scope) {
 
 
 // Lookup a symbol by name
-int lookup_symbol(char *name) {
+Symbol* lookup_symbol(char *name) {
     for (int i = 0; i < symbol_count; i++) {
         if (strcmp(symbol_table[i].name, name) == 0) {
-            return i;  // Found, return index
+            printf("DEBUG: Found symbol: %s, Type: %s\n", name, symbol_table[i].type);
+            return &symbol_table[i];  // Found, return pointer to symbol
         }
     }
-    return -1;  // Not found
+    return NULL;  // Not found
 }
 
 // Print symbol table
@@ -70,6 +93,13 @@ void print_symbol_table() {
         printf("%d\t%s\t\t%s\t\t%s\t\t%s\t\t%d\n", i, symbol_table[i].name, symbol_table[i].type,
                symbol_table[i].scope, symbol_table[i].is_array ? "Yes" : "No", symbol_table[i].array_size);
     }
+}
+
+void freeParamTypes(char** paramTypes, int count) {
+    for (int i = 0; i < count; i++) {
+        free(paramTypes[i]);
+    }
+    free(paramTypes);
 }
 
 // Clean up symbol table

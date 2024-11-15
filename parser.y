@@ -10,6 +10,7 @@
 #include "parser.tab.h"
 
 
+
 extern int yylex();
 extern int yyparse();
 extern int yylineno;
@@ -61,7 +62,7 @@ char** extractParamTypes(ASTNode** params, int count) {
 %token <char> SEMICOLON EQ PLUS MINUS MULT DIVIDE
 %token <char> NOT LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE COMMA
 
-%type <node> program statements statement expression declaration assignment write_statement if_statement return_statement function_declaration variable_declaration parameter_list parameters
+%type <node> program statements statement expression declaration assignment write_statement if_statement return_statement function_declaration variable_declaration parameter_list parameters argument_list
 
 %left OR
 %left AND
@@ -96,6 +97,7 @@ statements:
     }
     | /* empty */ { $$ = createStatementsNode(NULL, 0); }
     ;
+
 
 
 statement:
@@ -166,7 +168,6 @@ variable_declaration:
     ;
 
 function_declaration:
-
     FUNCTION TYPE IDENTIFIER LPAREN parameter_list RPAREN LBRACE statements RBRACE
     {
         printf("DEBUG: Processing full function declaration for %s\n", $3);
@@ -286,6 +287,7 @@ parameters:
     ;
 
 
+
 assignment:
     IDENTIFIER EQ expression SEMICOLON
     {
@@ -347,14 +349,13 @@ expression:
         printf("Identifier expression: %s\n", $1);
         free($1);
     }
-<<<<<<< Updated upstream
-=======
+
     | IDENTIFIER LPAREN argument_list RPAREN
     {
         $$ = createFunctionCallNode($1, $3);
         printf("Function call expression: %s\n", $1);
     }
->>>>>>> Stashed changes
+
     | BOOLVAL
     {
         $$ = createBooleanNode($1);
@@ -405,6 +406,21 @@ expression:
     {
         $$ = createArrayAccessNode($1, $3);
         printf("Array access: %s[%s].\n", $1, $3);
+    }
+    ;
+
+    argument_list:
+    /* empty */
+    {
+        $$ = createArgumentListNode(NULL, 0);
+    }
+    | expression
+    {
+        $$ = createArgumentListNode(&$1, 1);
+    }
+    | argument_list COMMA expression
+    {
+        $$ = appendArgumentNode($1, $3);
     }
     ;
 
