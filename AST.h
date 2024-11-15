@@ -85,7 +85,11 @@ ASTNode* createUnaryOpNode(ASTNode* expr);
 ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type);
 ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType, ASTNode* body);
 ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type);
+<<<<<<< Updated upstream
 ASTNode* createParametersNode(ASTNode* parameter, int count);
+=======
+ASTNode* createParametersNode(ASTNode** params, int count);
+>>>>>>> Stashed changes
 ASTNode* createArrayDeclarationNode(ASTNode* identifier, char* typeNode, int arraySize);
 ASTNode* createArrayAccessNode(ASTNode* identifier, ASTNode* indexNode);
 ASTNode* createArrayAssignmentNode(char* id, ASTNode* index, ASTNode* value);

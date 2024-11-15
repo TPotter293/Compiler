@@ -3,6 +3,14 @@
 
 #define TABLE_SIZE 100
 
+// Define FunctionInfo structure
+typedef struct {
+    char* name;
+    char* returnType;
+    char** paramTypes;
+    int paramCount;
+} FunctionInfo;
+
 typedef struct {
     char *name;     // Identifier name
     char *type;     // Type (int, float, etc.)

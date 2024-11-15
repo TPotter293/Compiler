@@ -137,7 +137,11 @@ void generateTAC(ASTNode* node) {
             break;
         case NODE_TYPE_BOOLEAN:
             char* bool_temp = newTemp();
-            sprintf(tac_line, "%s = %s", bool_temp, node->boolean_val);
+            int bool_val = 0;
+            if (strcmp(node->boolean_val, "true") == 0) {
+                bool_val = 1;
+            }
+            sprintf(tac_line, "%s = %s", bool_temp, bool_val);
             printf("DEBUG: Boolean -> %s\n", tac_line);
             generateTACLine(tac_line);
             node->temp_var_name = bool_temp; 
@@ -230,7 +234,11 @@ void analyzeWrite(ASTNode* node) {
     analyzeNode(node->left);
 
     char tac_line[100];
-    sprintf(tac_line, "print %s", node->left->id);
+    if (node->left->temp_var_name != NULL) {
+        sprintf(tac_line, "print %s", node->left->temp_var_name);
+    } else {
+        sprintf(tac_line, "print %s", node->left->id);
+    }
     generateTACLine(tac_line);
 }
 
@@ -246,6 +254,12 @@ void analyzeBinaryOp(ASTNode* node) {
         exit(1);
     }
 
+<<<<<<< Updated upstream
+=======
+    printf("DEBUG: Left operand value: %s\n", node->left->temp_var_name);
+    printf("DEBUG: Right operand value: %s\n", node->right->temp_var_name);
+
+>>>>>>> Stashed changes
     sprintf(tac_line, "%s = %s %s %s", temp, node->left->temp_var_name, node->op, node->right->temp_var_name);
     printf("DEBUG: Binary Operation TAC -> %s\n", tac_line);
     generateTACLine(tac_line);
@@ -274,6 +288,162 @@ void analyzeIdentifier(ASTNode* node) {
     }
 }
 
+<<<<<<< Updated upstream
+=======
+
+// Function to analyze function declarations
+void analyzeFunctionDeclaration(ASTNode* node) {
+    if (node == NULL) {
+        fprintf(stderr, "Error: NULL node in function declaration analysis\n");
+        return;
+    }
+
+    // Check that the node is indeed a function declaration
+    if (node->type != NODE_TYPE_FUNCTION_DECLARATION) {
+        fprintf(stderr, "Error: Node is not a function declaration\n");
+        return;
+    }
+
+    // Check the function identifier
+    if (node->id == NULL) {
+        fprintf(stderr, "Error: Function declaration missing identifier\n");
+        return;
+    }
+
+    // Check parameters
+    if (node->left != NULL) {
+        // Analyze parameters (node->left should be the parameters node)
+        analyzeNode(node->left);
+    } else {
+        fprintf(stderr, "Error: Function declaration missing parameters\n");
+        return;
+    }
+
+    // Check return type
+    if (node->right != NULL && node->right->id != NULL) {
+        // Analyze return type (node->right should be the return type node)
+        analyzeNode(node->right);
+    } else {
+        fprintf(stderr, "Error: Function declaration missing return type\n");
+        return;
+    }
+
+    // Check function body
+    if (node->statements.count > 0) {
+        for (int i = 0; i < node->statements.count; i++) {
+            analyzeNode(node->statements.stmts[i]);
+        }
+    }
+
+    // Extract parameter types
+    char** paramTypes = extractParamTypes(node->left->parameters.params, node->left->parameters.count);
+    if (paramTypes == NULL) {
+        fprintf(stderr, "Error: Failed to extract parameter types\n");
+        return;
+    }
+
+    // Insert function into symbol table
+    insert_symbol(node->id, "function", paramTypes, node->left->parameters.count, node->right->id);
+    freeParamTypes(paramTypes, node->left->parameters.count);
+
+    // Debugging: Print the function details
+    printf("DEBUG: Function '%s' with return type '%s' and %d parameters inserted into symbol table.\n",
+           node->id, node->right->id, node->left->parameters.count);
+}
+
+void analyzeParameters(ASTNode* node) {
+    if (node == NULL) {
+        fprintf(stderr, "Error: NULL node in parameters analysis\n");
+        return;
+    }
+
+    // Check that the node is indeed a parameters node
+    if (node->type != NODE_TYPE_PARAMETERS) {
+        fprintf(stderr, "Error: Node is not a parameters node\n");
+        return;
+    }
+
+    // Iterate over each parameter and analyze it
+    for (int i = 0; i < node->parameters.count; i++) {
+        ASTNode* param = node->parameters.params[i];
+        if (param != NULL) {
+            analyzeNode(param);
+        } else {
+            fprintf(stderr, "Error: NULL parameter at index %d\n", i);
+        }
+    }
+}
+
+void analyzeParameter(ASTNode* node) {
+    if (node == NULL) {
+        fprintf(stderr, "Error: NULL node in parameter analysis\n");
+        return;
+    }
+
+    // Check that the node is indeed a parameter node
+    if (node->type != NODE_TYPE_PARAMETER) {
+        fprintf(stderr, "Error: Node is not a parameter node\n");
+        return;
+    }
+
+    // Check the parameter identifier
+    if (node->param.identifier == NULL || node->param.identifier->id == NULL) {
+        fprintf(stderr, "Error: Parameter missing identifier\n");
+        return;
+    }
+
+    // Check the parameter type
+    if (node->param.paramType == NULL || node->param.paramType->id == NULL) {
+        fprintf(stderr, "Error: Parameter missing type\n");
+        return;
+    }
+
+    // Additional checks can be added here as needed
+}
+
+void analyzeReturn(ASTNode* node) {
+    if (node == NULL) {
+        fprintf(stderr, "Error: NULL node in return analysis\n");
+        return;
+    }
+
+    if (node->type != NODE_TYPE_RETURN) {
+        fprintf(stderr, "Error: Node is not a return node\n");
+        return;
+    }
+
+    if (node->left != NULL) {
+        analyzeNode(node->left);
+        if (node->left->temp_var_name != NULL) {
+            char tac_line[100];
+            sprintf(tac_line, "return %s", node->left->temp_var_name);
+            generateTACLine(tac_line);
+            printf("DEBUG: Return statement with temp variable %s\n", node->left->temp_var_name);
+        } else {
+            fprintf(stderr, "Error: Return expression does not produce a temp variable.\n");
+        }
+    } else {
+        fprintf(stderr, "Error: Return statement missing expression\n");
+    }
+}
+
+
+void analyzeArgumentList(ASTNode* node) {
+    if (node == NULL) {
+        fprintf(stderr, "Error: NULL node in argument list analysis\n");
+        return;
+    }
+
+    for (int i = 0; i < node->argumentList.count; i++) {
+        ASTNode* arg = node->argumentList.args[i];
+        analyzeNode(arg);  // Analyze each argument
+        if (arg->temp_var_name == NULL) {
+            fprintf(stderr, "Error: Argument %d does not produce a temp variable.\n", i);
+        }
+    }
+}
+
+>>>>>>> Stashed changes
 void analyzeArrayDeclaration(ASTNode* node) {
     // Array declarations don't output TAC but could be tracked in the symbol table
     printf("DEBUG: Array declaration of %s with type %s and size %d\n", node->id, node->varDecl.varType, node->varDecl.arraySize);
@@ -310,7 +480,7 @@ void analyzeArrayAssignment(ASTNode* node) {
     char tac_line[100];
 
     // Generate TAC for array assignment: array[index] = value
-    sprintf(tac_line, "%s[%s] = %s", node->id, node->arrayIndex->temp_var_name, node->assignedValue->temp_var_name);
+    sprintf(tac_line, "%s[%d] = %s", node->id, node->value.intValue, node->assignedValue->temp_var_name);
     generateTACLine(tac_line);
 
     printf("DEBUG: Array Assignment TAC -> %s\n", tac_line);
@@ -343,6 +513,28 @@ void analyzeNode(ASTNode* node) {
             break;
         case NODE_TYPE_IDENTIFIER:
             analyzeIdentifier(node);
+<<<<<<< Updated upstream
+=======
+            printf("DEBUG: Identifier node %s has temp variable %s\n", node->id, node->temp_var_name);
+            break;
+        case NODE_TYPE_FUNCTION_DECLARATION:
+            analyzeFunctionDeclaration(node);
+            break;
+        case NODE_TYPE_PARAMETERS:
+            analyzeParameters(node);
+            break;
+        case NODE_TYPE_PARAMETER:
+            analyzeParameter(node);
+            break;
+        case NODE_TYPE_RETURN:
+            analyzeReturn(node);
+            break;
+        case NODE_TYPE_FUNCTION_CALL:
+            analyzeFunctionCall(node);
+            break;
+        case NODE_TYPE_ARGUMENT_LIST:
+            analyzeArgumentList(node);
+>>>>>>> Stashed changes
             break;
         case NODE_TYPE_INTEGER:
             char* temp = newTemp();
@@ -368,7 +560,14 @@ void analyzeNode(ASTNode* node) {
             {
                 char* temp = newTemp();
                 char tac_line[100];
-                sprintf(tac_line, "%s = %s", temp, node->boolean_val);
+
+                int bool_val = 0;
+                if (strcmp(node->boolean_val, "true") == 0) {
+                    bool_val = 1;
+                }
+
+
+                sprintf(tac_line, "%s = %d", temp, bool_val);
                 generateTACLine(tac_line);
                 node->temp_var_name = temp;
 

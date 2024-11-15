@@ -141,7 +141,7 @@ declaration:
     {
         $$ = createDeclarationNode(createIdentifierNode($1), createIdentifierNode($2));
         printf("Declaration of variable '%s' of type '%s'.\n", $2, $1);
-        insert_symbol($2, $1, current_scope);
+        insert_symbol($2, $1, "null", 0, "null");
         print_symbol_table();
     }
     | TYPE LBRACKET INT RBRACKET IDENTIFIER SEMICOLON
@@ -158,7 +158,7 @@ variable_declaration:
     {
         $$ = createVariableDeclarationNode(createIdentifierNode($2), createIdentifierNode($3));
         printf("Variable declaration: %s of type %s in scope '%s'\n", $2, $3, current_scope);
-        insert_symbol($2, $3, current_scope); // Use current_scope
+        insert_symbol($2, $3, "null", 0, "null"); // Use current_scope
         print_symbol_table();
         free($2);
         free($3);
@@ -347,6 +347,14 @@ expression:
         printf("Identifier expression: %s\n", $1);
         free($1);
     }
+<<<<<<< Updated upstream
+=======
+    | IDENTIFIER LPAREN argument_list RPAREN
+    {
+        $$ = createFunctionCallNode($1, $3);
+        printf("Function call expression: %s\n", $1);
+    }
+>>>>>>> Stashed changes
     | BOOLVAL
     {
         $$ = createBooleanNode($1);

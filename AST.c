@@ -176,6 +176,113 @@ ASTNode* createBinaryOpNode(char* op, ASTNode* left, ASTNode* right) {
     return node;
 }
 
+<<<<<<< Updated upstream
+=======
+// Example usage in processing expressions
+void processExpression(ASTNode* node) {
+    if (!node) return;
+
+    switch (node->type) {
+        case NODE_TYPE_BINARY_OP:
+            processExpression(node->left);
+            processExpression(node->right);
+            // Generate TAC for binary operation
+            printf("TAC: %s = %s %s %s\n", 
+                   node->temp_var_name, 
+                   node->left->temp_var_name, 
+                   node->op, 
+                   node->right->temp_var_name);
+            break;
+
+        case NODE_TYPE_UNARY_OP:
+            processExpression(node->left); // Process the expression
+            // Generate TAC for unary operation
+            printf("TAC: %s = %s %s\n", 
+                   node->temp_var_name, 
+                   node->left->temp_var_name, 
+                   node->op); // Ensure op is set correctly
+            break;
+
+        case NODE_TYPE_INTEGER:
+            // Directly use the number value
+            node->temp_var_name = generateTempVariable();
+            printf("TAC: %s = %d\n", 
+                   node->temp_var_name, 
+                   node->value);
+            break;
+        case NODE_TYPE_FLOAT:
+            // Directly use the number value
+            node->temp_var_name = generateTempVariable();
+            printf("TAC: %s = %d\n", 
+                   node->temp_var_name, 
+                   node->value);
+            break;
+
+        case NODE_TYPE_IDENTIFIER:
+            // Use the identifier directly
+            node->temp_var_name = strdup(node->id); // No need for a temporary variable
+            break;
+
+        case NODE_TYPE_ASSIGNMENT:
+            processExpression(node->right); // Process the expression
+            printf("TAC: %s = %s\n", 
+                   node->left->id, // The identifier name
+                   node->right->temp_var_name);
+            break;
+
+        case NODE_TYPE_FUNCTION_CALL:
+            // Handle function call, assuming arguments are already processed
+            printf("TAC: CALL %s\n", node->id);
+            break;
+
+        default:
+            printf("DEBUG: Unknown expression type\n");
+            break;
+    }
+}
+
+void processFunctionCall(ASTNode* node) {
+    if (node->funcCall.arguments) {
+        processExpression(node->funcCall.arguments);
+    }
+    // Generate TAC for the function call
+    printf("TAC: CALL %s\n", node->id);
+}
+
+void processStatement(ASTNode* node) {
+    if (!node) return;
+
+    switch (node->type) {
+        case NODE_TYPE_WRITE:
+            processExpression(node->left);
+            printf("TAC: WRITE %s\n", node->left->temp_var_name);
+            break;
+
+        case NODE_TYPE_RETURN:
+            processExpression(node->left);
+            printf("TAC: RETURN %s\n", node->left->temp_var_name);
+            break;
+
+        default:
+            printf("DEBUG: Unknown statement type\n");
+            break;
+    }
+}
+
+void processAST(ASTNode* root) {
+    if (!root) return;
+
+    // Example for processing a program node
+    if (root->type == NODE_TYPE_PROGRAM) {
+        for (int i = 0; i < root->statements.count; i++) {
+            processStatement(root->statements.stmts[i]);
+        }
+    } else {
+        processExpression(root);
+    }
+}
+
+>>>>>>> Stashed changes
 // Create a unary operation node
 ASTNode* createUnaryOpNode(ASTNode* expr) {
     ASTNode* node = createNode();
@@ -219,6 +326,35 @@ ASTNode* createParametersNode(ASTNode* parameter, int count) {
     return node;
 }
 
+<<<<<<< Updated upstream
+=======
+// Create a function call node
+ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments) {
+    ASTNode* node = createNode();
+    node->type = NODE_TYPE_FUNCTION_CALL;
+    node->id = strdup(identifier);
+    node->funcCall.arguments = arguments;
+    return node;
+}
+
+// Create an argument list node
+ASTNode* createArgumentListNode(ASTNode** args, int count) {
+    ASTNode* node = createNode();
+    node->type = NODE_TYPE_ARGUMENT_LIST;
+    node->argumentList.count = count;
+    node->argumentList.args = malloc(sizeof(ASTNode*) * count);
+    if (node->argumentList.args == NULL) {
+        fprintf(stderr, "Memory allocation failed for argument list array\n");
+        free(node);
+        return NULL;
+    }
+    for (int i = 0; i < count; i++) {
+        node->argumentList.args[i] = args[i];
+    }
+    return node;
+}
+
+>>>>>>> Stashed changes
 ASTNode* createArrayDeclarationNode(ASTNode* identifier, char* typeNode, int arraySize) {
     ASTNode* node = createNode();
     node->type = NODE_TYPE_ARRAY_DECLARATION;
@@ -233,7 +369,8 @@ ASTNode* createArrayAccessNode(ASTNode* identifier, ASTNode* indexNode) {
     ASTNode* node = createNode(); 
     node->type = NODE_TYPE_ARRAY_ACCESS;
     node->id  = identifier;        // Identifier (array name)
-    node->value.intValue = indexNode;    // Index to access
+    node->value.intValue = indexNode;
+    node->arrayIndex;    // Index to access
 
     return node;
 }
@@ -242,7 +379,7 @@ ASTNode* createArrayAssignmentNode(char* id, ASTNode* index, ASTNode* value) {
     ASTNode* node = createNode();  // Create a new node
     node->type = NODE_TYPE_ARRAY_ASSIGNMENT;  // Set the node type
     node->id = strdup(id);  // Store the identifier for the array
-    node->arrayIndex = index;  // Store the index expression
+    node->value.intValue = index->value.intValue;  // Store the index expression
     node->assignedValue = value;  // Store the value to assign
     return node;  // Return the created node
 }
