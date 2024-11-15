@@ -197,6 +197,16 @@ ws          {delim}+
                 return COMMA;
               }
 
+"<"          { chars++;
+                printf("%s : LT\n", yytext);
+                return LT;
+              }
+
+">"          { chars++;
+                printf("%s : GT\n", yytext);
+                return GT;
+              }
+
 \n {lines++; chars = 0;}
 [ \t]+       { chars += yyleng; } // Count all whitespace characters
 
