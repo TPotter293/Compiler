@@ -279,13 +279,6 @@ void processExpression(ASTNode* node) {
                    node->temp_var_name, 
                    node->value);
             break;
-        case NODE_TYPE_FLOAT:
-            // Directly use the number value
-            node->temp_var_name = generateTempVariable();
-            printf("TAC: %s = %d\n", 
-                   node->temp_var_name, 
-                   node->value);
-            break;
             
 
         case NODE_TYPE_IDENTIFIER:
@@ -476,15 +469,6 @@ ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments) {
     return node;
 }
 
-
-// Create a function call node
-ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments) {
-    ASTNode* node = createNode();
-    node->type = NODE_TYPE_FUNCTION_CALL;
-    node->id = strdup(identifier);
-    node->funcCall.arguments = arguments;
-    return node;
-}
 
 // Create an argument list node
 ASTNode* createArgumentListNode(ASTNode** args, int count) {

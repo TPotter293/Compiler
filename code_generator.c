@@ -135,24 +135,21 @@ void generateAssignmentCode(TACInstruction* instr, FILE* output_file) {
     }
 }
 
-void generateWriteCode(TACInstruction* instr, FILE* output_file) {
-    printf("Generating write code for: %s\n", instr->arg1);
-    if (is_float(instr->arg1)) {
-        int offset = getVariableLocation(instr->arg1);
-        fprintf(output_file, "li.s $f0, %s\n", instr->arg1);
+void generateWriteCode(const char* arg, FILE* output_file) {
+    printf("Generating write code for: %s\n", arg);
+    if (is_float(arg)) {
+        int offset = getVariableLocation(arg);
+        fprintf(output_file, "l.s $f0, %d($sp)\n", offset);
         fprintf(output_file, "li $v0, 2\n"); // Print float
-        printf("Preparing to print float variable: %s\n", instr->arg1);
     } else {
-        int offset = getVariableLocation(instr->arg1);
+        int offset = getVariableLocation(arg);
         fprintf(output_file, "lw $a0, %d($sp)\n", offset);
         fprintf(output_file, "li $v0, 1\n"); // Print integer
-        printf("Preparing to print integer variable: %s\n", instr->arg1);
     }
     fprintf(output_file, "syscall\n");
     fprintf(output_file, "la $a0, newline\n");
     fprintf(output_file, "li $v0, 4\n");
     fprintf(output_file, "syscall\n");
-    printf("Print syscall executed.\n");
 }
 
 void generateBinaryOpCode(TACInstruction* instr, FILE* output_file) {

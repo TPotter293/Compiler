@@ -543,7 +543,6 @@ void analyzeArgumentList(ASTNode* node) {
     }
 }
 
-}
 
 void analyzeArrayDeclaration(ASTNode* node) {
     // Array declarations don't output TAC but could be tracked in the symbol table

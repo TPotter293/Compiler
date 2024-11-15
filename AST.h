@@ -105,7 +105,6 @@ ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters,
 ASTNode* createFunctionPrototypeNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType);
 ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type);
 
-ASTNode* createParametersNode(ASTNode* parameter, int count);
 ASTNode* createParametersNode(ASTNode** params, int count);
 
 ASTNode* createArrayDeclarationNode(ASTNode* identifier, char* typeNode, int arraySize);
