@@ -8,6 +8,8 @@
 #include "optimizer.h"
 #include "code_generator.h"
 #include "parser.tab.h"
+#define LT 300
+#define GT 301
 
 
 
@@ -71,6 +73,9 @@ char** extractParamTypes(ASTNode** params, int count) {
 %token <strval> TYPE IDENTIFIER BOOLVAL
 %token <char> SEMICOLON EQ PLUS MINUS MULT DIVIDE
 %token <char> NOT LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE COMMA
+%token LT
+%token GT
+
 
 %type <node> program statements statement expression declaration assignment write_statement if_statement return_statement function_declaration variable_declaration parameter_list parameters argument_list
 
@@ -354,6 +359,17 @@ expression:
         $$ = createFloatNode($1);
         printf("Float expression: %f\n", $1);
     }
+    | expression LT expression
+    {
+        $$ = createBinaryOpNode("<", $1, $3);
+        printf("Less than expression parsed.\n");
+    }
+    | expression GT expression
+    {
+        $$ = createBinaryOpNode(">", $1, $3);
+        printf("Greater than expression parsed.\n");
+    }
+
     | IDENTIFIER
     {
         $$ = createIdentifierNode($1);
