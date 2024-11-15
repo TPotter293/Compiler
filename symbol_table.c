@@ -14,6 +14,7 @@ void init_symbol_table() {
 }
 
 // Insert a new symbol
+// Update insert_symbol to handle values
 void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, char* returnType) {
     if (name == NULL || type == NULL) {
         fprintf(stderr, "Error: NULL name or type passed to insert_symbol\n");
@@ -30,7 +31,7 @@ void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, ch
     symbol_table[symbol_count].name = strdup(name);
     symbol_table[symbol_count].type = strdup(type);
 
-    if (strcmp(type, "function") == 0) {
+    if (strcmp(type, "function") == 0 && paramTypes != NULL) {
         symbol_table[symbol_count].functionInfo = malloc(sizeof(FunctionInfo));
         symbol_table[symbol_count].functionInfo->name = strdup(name);
         symbol_table[symbol_count].functionInfo->returnType = returnType ? strdup(returnType) : NULL;
@@ -38,20 +39,16 @@ void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, ch
         symbol_table[symbol_count].functionInfo->paramCount = paramCount;
 
         for (int i = 0; i < paramCount; i++) {
-            if (paramTypes[i] != NULL) {
-                symbol_table[symbol_count].functionInfo->paramTypes[i] = strdup(paramTypes[i]);
-            } else {
-                fprintf(stderr, "Error: NULL parameter type at index %d\n", i);
-                symbol_table[symbol_count].functionInfo->paramTypes[i] = NULL;
-            }
+            symbol_table[symbol_count].functionInfo->paramTypes[i] = 
+                paramTypes[i] ? strdup(paramTypes[i]) : strdup("unknown");
         }
     } else {
         symbol_table[symbol_count].functionInfo = NULL;
     }
-    printf("DEBUG: Inserted symbol: %s, Type: %s\n", name, type);
 
     symbol_count++;
 }
+
 
 // Insert a new array symbol
 void insert_array_symbol(char *name, char *type, int size, char *scope) {
@@ -70,6 +67,16 @@ void insert_array_symbol(char *name, char *type, int size, char *scope) {
 
     symbol_count++;
 }
+
+
+// Add this function implementation
+void update_symbol_value(char* name, char* value) {
+    Symbol* entry = lookup_symbol(name);
+    if (entry) {
+        entry->type = strdup(value);  // Using the 'type' field to store the value
+    }
+}
+
 
 
 // Lookup a symbol by name

@@ -19,6 +19,7 @@ typedef struct {
     char *scope;
     int is_array;
     int array_size;
+     char* value;
 } Symbol;
 
 // Declare symbol table functions
@@ -29,5 +30,8 @@ void insert_array_symbol(char *name, char *type, int size, char *scope);
 void print_symbol_table();
 void freeParamTypes(char** paramTypes, int count);
 void clean_up_symbol_table();
+// Add this function declaration
+void update_symbol_value(char* name, char* value);
+
 
 #endif
