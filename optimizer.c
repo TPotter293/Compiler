@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -55,7 +56,28 @@ int read_TAC(const char* filename, TACInstruction* instructions) {
             instructions[count].is_dead = 0;
             instructions[count].is_optimized = 0;
             instructions[count].is_preserved = 0; // Initialize preservation flag
-        } else {
+            
+        } else if (strncmp(line, "ifFalse", 7) == 0) {
+    sscanf(line, "ifFalse %s goto %s", instructions[count].arg1, instructions[count].arg2);
+    strcpy(instructions[count].result, "ifFalse");
+    instructions[count].op[0] = '\0';
+    instructions[count].is_dead = 0;
+    instructions[count].is_optimized = 0;
+    instructions[count].is_preserved = 1;  // Preserve conditional jumps
+    count++;
+        }
+        else if (strncmp(line, "label", 5) == 0) {
+            sscanf(line, "label %s:", instructions[count].arg1);
+            strcpy(instructions[count].result, "label");
+            instructions[count].op[0] = '\0';
+            instructions[count].arg2[0] = '\0';
+            instructions[count].is_dead = 0;
+            instructions[count].is_optimized = 0;
+            instructions[count].is_preserved = 1;  // Preserve labels
+            count++;
+        }
+
+        else {
             continue;
         }
         printf("Read instruction: %s = %s %s %s\n", instructions[count].result, instructions[count].arg1, instructions[count].op, instructions[count].arg2);
@@ -123,25 +145,34 @@ void algebraic_simplification(TACInstruction* instructions, int* num_instruction
 
 void copy_propagation(TACInstruction* instructions, int* num_instructions) {
     for (int i = 0; i < *num_instructions; i++) {
+        // Skip propagation for variables used in conditions
+        if (strncmp(instructions[i].result, "f", 1) == 0) {
+            continue;
+        }
+        
         if (instructions[i].op[0] == '\0' && !is_number(instructions[i].arg1)) {
             for (int j = i + 1; j < *num_instructions; j++) {
+                // Don't propagate into conditional statements
+                if (strncmp(instructions[j].result, "f", 1) == 0) {
+                    continue;
+                }
+                
                 if (strcmp(instructions[j].arg1, instructions[i].result) == 0) {
                     strcpy(instructions[j].arg1, instructions[i].arg1);
                     instructions[j].is_optimized = 1;
-                    printf("Propagated: %s to %s\n", instructions[i].arg1, instructions[j].result);
                 }
                 if (strcmp(instructions[j].arg2, instructions[i].result) == 0) {
                     strcpy(instructions[j].arg2, instructions[i].arg1);
                     instructions[j].is_optimized = 1;
-                    printf("Propagated: %s to %s\n", instructions[i].arg1, instructions[j].result);
                 }
                 if (strcmp(instructions[j].result, instructions[i].result) == 0) {
-                    break;  // Stop propagation if the variable is reassigned
+                    break;
                 }
             }
         }
     }
 }
+
 
 
 void dead_code_elimination(TACInstruction* instructions, int* num_instructions) {
@@ -149,11 +180,35 @@ void dead_code_elimination(TACInstruction* instructions, int* num_instructions) 
 
     // Track dependencies
     for (int i = 0; i < *num_instructions; i++) {
+        // Mark all instructions used in control flow as used
+        if (strcmp(instructions[i].result, "ifFalse") == 0 ||
+            strcmp(instructions[i].result, "label") == 0 ||
+            strncmp(instructions[i].result, "f", 1) == 0) {
+            used_instructions[i] = 1;
+            
+            // Mark all variables used in conditions as used
+            for (int j = 0; j < i; j++) {
+                if (strcmp(instructions[j].result, instructions[i].arg1) == 0 ||
+                    strcmp(instructions[j].result, instructions[i].arg2) == 0) {
+                    used_instructions[j] = 1;
+                    // Also preserve the original variable assignments
+                    for (int k = 0; k < j; k++) {
+                        if (strcmp(instructions[k].result, instructions[j].arg1) == 0 ||
+                            strcmp(instructions[k].result, instructions[j].arg2) == 0) {
+                            used_instructions[k] = 1;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Original dependency tracking
         if (!instructions[i].is_dead && !instructions[i].is_preserved) {
             for (int j = i + 1; j < *num_instructions; j++) {
-                if (strcmp(instructions[j].arg1, instructions[i].result) == 0 || 
+                if (strcmp(instructions[j].arg1, instructions[i].result) == 0 ||
                     strcmp(instructions[j].arg2, instructions[i].result) == 0 ||
-                    (strcmp(instructions[j].result, "print") == 0 && strcmp(instructions[j].arg1, instructions[i].result) == 0)) {
+                    (strcmp(instructions[j].result, "print") == 0 &&
+                     strcmp(instructions[j].arg1, instructions[i].result) == 0)) {
                     used_instructions[i] = 1;
                     break;
                 }
@@ -161,7 +216,7 @@ void dead_code_elimination(TACInstruction* instructions, int* num_instructions) 
         }
     }
 
-    // Mark instructions as dead if not used and not preserved
+    // Mark instructions as dead
     for (int i = 0; i < *num_instructions; i++) {
         if (!used_instructions[i] && !instructions[i].is_preserved) {
             instructions[i].is_dead = 1;
@@ -169,6 +224,8 @@ void dead_code_elimination(TACInstruction* instructions, int* num_instructions) 
         }
     }
 }
+
+
 
 
 void write_TAC(const char* filename, TACInstruction* instructions, int num_instructions) {
@@ -182,6 +239,10 @@ void write_TAC(const char* filename, TACInstruction* instructions, int num_instr
         if (!instructions[i].is_dead) {
             if (strcmp(instructions[i].result, "print") == 0) {
                 fprintf(file, "print %s\n", instructions[i].arg1);
+            } else if (strcmp(instructions[i].result, "ifFalse") == 0) {
+                fprintf(file, "ifFalse %s goto %s\n", instructions[i].arg1, instructions[i].arg2);
+            } else if (strcmp(instructions[i].result, "label") == 0) {
+                fprintf(file, "label %s:\n", instructions[i].arg1);
             } else if (instructions[i].op[0] != '\0') {
                 fprintf(file, "%s = %s %s %s\n", instructions[i].result, instructions[i].arg1, instructions[i].op, instructions[i].arg2);
             } else {
@@ -192,6 +253,7 @@ void write_TAC(const char* filename, TACInstruction* instructions, int num_instr
 
     fclose(file);
 }
+
 
 void optimize_TAC(const char* input_filename, const char* output_filename) {
     TACInstruction instructions[MAX_INSTRUCTIONS];
@@ -219,6 +281,43 @@ void optimize_TAC(const char* input_filename, const char* output_filename) {
     // Mark print instructions as preserved
     for (int i = 0; i < num_instructions; i++) {
         if (strcmp(instructions[i].result, "print") == 0) {
+            instructions[i].is_preserved = 1;
+        }
+    }
+
+        // Mark control flow instructions and their dependencies as preserved
+    for (int i = 0; i < num_instructions; i++) {
+        // Preserve labels
+        if (strncmp(instructions[i].result, "label", 5) == 0) {
+            instructions[i].is_preserved = 1;
+        }
+        // Preserve conditional jumps and their conditions
+        if (strncmp(instructions[i].result, "f", 1) == 0) {
+            instructions[i].is_preserved = 1;
+            // Preserve variables used in condition
+            for (int j = 0; j < i; j++) {
+                if (strcmp(instructions[j].result, instructions[i].arg1) == 0 ||
+                    strcmp(instructions[j].result, instructions[i].arg2) == 0) {
+                    instructions[j].is_preserved = 1;
+                }
+            }
+        }
+    }
+
+
+    for (int i = 0; i < num_instructions; i++) {
+        if (strcmp(instructions[i].result, "ifFalse") == 0) {
+            for (int j = 0; j < i; j++) {
+                if (strcmp(instructions[j].result, instructions[i].arg1) == 0) {
+                    instructions[j].is_preserved = 1;
+                    for (int k = 0; k < j; k++) {
+                        if (strcmp(instructions[k].result, instructions[j].arg1) == 0 ||
+                            strcmp(instructions[k].result, instructions[j].arg2) == 0) {
+                            instructions[k].is_preserved = 1;
+                        }
+                    }
+                }
+            }
             instructions[i].is_preserved = 1;
         }
     }
