@@ -144,7 +144,11 @@ void generateTAC(ASTNode* node) {
             break;
         case NODE_TYPE_BOOLEAN:
             char* bool_temp = newTemp();
-            sprintf(tac_line, "%s = %s", bool_temp, node->boolean_val);
+            int bool_val = 0;
+            if (strcmp(node->boolean_val, "true") == 0) {
+                bool_val = 1;
+            }
+            sprintf(tac_line, "%s = %s", bool_temp, bool_val);
             printf("DEBUG: Boolean -> %s\n", tac_line);
             generateTACLine(tac_line);
             node->temp_var_name = bool_temp; 
@@ -346,7 +350,11 @@ void analyzeWrite(ASTNode* node) {
     analyzeNode(node->left);
 
     char tac_line[100];
-    sprintf(tac_line, "print %s", node->left->id);
+    if (node->left->temp_var_name != NULL) {
+        sprintf(tac_line, "print %s", node->left->temp_var_name);
+    } else {
+        sprintf(tac_line, "print %s", node->left->id);
+    }
     generateTACLine(tac_line);
 }
 
@@ -365,11 +373,13 @@ void analyzeBinaryOp(ASTNode* node) {
         exit(1);
     }
 
+
     printf("DEBUG: Left operand value: %s\n", node->left->temp_var_name);
     printf("DEBUG: Right operand value: %s\n", node->right->temp_var_name);
 
     char* temp = newTemp();
     char tac_line[100];
+
     sprintf(tac_line, "%s = %s %s %s", temp, node->left->temp_var_name, node->op, node->right->temp_var_name);
     generateTACLine(tac_line);
 
@@ -404,6 +414,7 @@ void analyzeIdentifier(ASTNode* node) {
         printf("DEBUG: Initialized '%s' with temp variable: %s\n", node->id, temp);
     }
 }
+
 
 
 // Function to analyze function declarations
@@ -557,6 +568,8 @@ void analyzeArgumentList(ASTNode* node) {
         }
     }
 
+}
+
 void analyzeArrayDeclaration(ASTNode* node) {
     // Array declarations don't output TAC but could be tracked in the symbol table
     printf("DEBUG: Array declaration of %s with type %s and size %d\n", node->id, node->varDecl.varType, node->varDecl.arraySize);
@@ -593,7 +606,7 @@ void analyzeArrayAssignment(ASTNode* node) {
     char tac_line[100];
 
     // Generate TAC for array assignment: array[index] = value
-    sprintf(tac_line, "%s[%s] = %s", node->id, node->arrayIndex->temp_var_name, node->assignedValue->temp_var_name);
+    sprintf(tac_line, "%s[%d] = %s", node->id, node->value.intValue, node->assignedValue->temp_var_name);
     generateTACLine(tac_line);
 
     printf("DEBUG: Array Assignment TAC -> %s\n", tac_line);
@@ -628,16 +641,7 @@ void analyzeNode(ASTNode* node) {
             analyzeIdentifier(node);
             printf("DEBUG: Identifier node %s has temp variable %s\n", node->id, node->temp_var_name);
             break;
-        case NODE_TYPE_NUMBER:
-            // Existing logic for numbers
-            // Directly produce a temporary variable with the number's value
-            char* num_temp = newTemp();
-            char tac_line[100];
-            sprintf(tac_line, "%s = %d", num_temp, node->value);
-            generateTACLine(tac_line);
-            node->temp_var_name = num_temp;
-            printf("DEBUG: Number node %d assigned to temp variable %s\n", node->value, num_temp);
-            break;
+
         case NODE_TYPE_FUNCTION_DECLARATION:
             analyzeFunctionDeclaration(node);
             break;
@@ -655,6 +659,7 @@ void analyzeNode(ASTNode* node) {
             break;
         case NODE_TYPE_ARGUMENT_LIST:
             analyzeArgumentList(node);
+
             break;
         case NODE_TYPE_INTEGER:
             char* temp = newTemp();
@@ -680,7 +685,14 @@ void analyzeNode(ASTNode* node) {
             {
                 char* temp = newTemp();
                 char tac_line[100];
-                sprintf(tac_line, "%s = %s", temp, node->boolean_val);
+
+                int bool_val = 0;
+                if (strcmp(node->boolean_val, "true") == 0) {
+                    bool_val = 1;
+                }
+
+
+                sprintf(tac_line, "%s = %d", temp, bool_val);
                 generateTACLine(tac_line);
                 node->temp_var_name = temp;
 

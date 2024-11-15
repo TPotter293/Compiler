@@ -55,9 +55,8 @@ void insert_symbol(char *name, char *type, char** paramTypes, int paramCount, ch
 
 // Insert a new array symbol
 void insert_array_symbol(char *name, char *type, int size, char *scope) {
-
     // Check for redeclaration
-    if (lookup_symbol(name) != -1) {
+    if (lookup_symbol(name) != NULL) {  // Compare to NULL instead of -1
         printf("Error: redeclaration of array %s\n", name);
         return;
     }
@@ -71,6 +70,7 @@ void insert_array_symbol(char *name, char *type, int size, char *scope) {
 
     symbol_count++;
 }
+
 
 // Lookup a symbol by name
 Symbol* lookup_symbol(char *name) {

@@ -104,8 +104,10 @@ ASTNode* createVariableDeclarationNode(ASTNode* identifier, ASTNode* type);
 ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType, ASTNode* body);
 ASTNode* createFunctionPrototypeNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType);
 ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type);
-ASTNode* createParametersNode(ASTNode** params, int count);
+
 ASTNode* createParametersNode(ASTNode* parameter, int count);
+ASTNode* createParametersNode(ASTNode** params, int count);
+
 ASTNode* createArrayDeclarationNode(ASTNode* identifier, char* typeNode, int arraySize);
 ASTNode* createArrayAccessNode(ASTNode* identifier, ASTNode* indexNode);
 ASTNode* createArrayAssignmentNode(char* id, ASTNode* index, ASTNode* value);
