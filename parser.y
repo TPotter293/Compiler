@@ -376,11 +376,13 @@ expression:
         printf("Identifier expression: %s\n", $1);
         free($1);
     }
+
     | IDENTIFIER LPAREN argument_list RPAREN
     {
         $$ = createFunctionCallNode($1, $3);
         printf("Function call expression: %s\n", $1);
     }
+
     | BOOLVAL
     {
         $$ = createBooleanNode($1);

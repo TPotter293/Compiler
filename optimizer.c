@@ -4,6 +4,8 @@
 #include <stdlib.h>
 
 #define MAX_INSTRUCTIONS 100
+#define MAX_ARRAY_SIZE 10
+
 
 typedef struct {
     char op[4];
@@ -12,7 +14,7 @@ typedef struct {
     char result[10];
     int is_dead;
     int is_optimized;
-    int is_preserved; // New field to mark preserved instructions
+    int is_preserved; 
 } TACInstruction;
 
 void print_instructions(TACInstruction* instructions, int num_instructions);
@@ -100,9 +102,9 @@ void constant_folding(TACInstruction* instructions, int* num_instructions) {
     for (int i = 0; i < *num_instructions; i++) {
         if (instructions[i].op[0] != '\0') {
             int arg1_val, arg2_val;
-            if (sscanf(instructions[i].arg1, "%d", &arg1_val) == 1 &&
-                sscanf(instructions[i].arg2, "%d", &arg2_val) == 1) {
-                int result = evaluate_constant_expression(arg1_val, arg2_val, instructions[i].op);
+            if (is_number(instructions[i].arg1) && is_number(instructions[i].arg2)) {
+                // Both operands are constants
+                int result = evaluate_constant_expression(atoi(instructions[i].arg1), atoi(instructions[i].arg2), instructions[i].op);
                 sprintf(instructions[i].arg1, "%d", result);
                 instructions[i].op[0] = '\0';
                 instructions[i].arg2[0] = '\0';
@@ -111,7 +113,6 @@ void constant_folding(TACInstruction* instructions, int* num_instructions) {
         }
     }
 }
-
 
 
 void algebraic_simplification(TACInstruction* instructions, int* num_instructions) {
@@ -145,6 +146,7 @@ void algebraic_simplification(TACInstruction* instructions, int* num_instruction
 
 void copy_propagation(TACInstruction* instructions, int* num_instructions) {
     for (int i = 0; i < *num_instructions; i++) {
+
         // Skip propagation for variables used in conditions
         if (strncmp(instructions[i].result, "f", 1) == 0) {
             continue;
@@ -170,15 +172,44 @@ void copy_propagation(TACInstruction* instructions, int* num_instructions) {
                 }
             }
         }
+
+        if (strchr(instructions[i].result, '[')) {
+            // Handle array assignments like arr[t0] = t1
+            for (int j = i + 1; j < *num_instructions; j++) {
+                if (strcmp(instructions[j].result, "print") == 0 &&
+                    strstr(instructions[j].arg1, instructions[i].result) != NULL) {
+                    // If an array element is being printed, check if it can be optimized
+                    if (is_number(instructions[i].arg2)) {
+                        // Directly replace array access with constant value
+                        strcpy(instructions[j].arg1, instructions[i].arg2);
+                        instructions[j].is_optimized = 1;
+                    } else if (is_number(instructions[i].arg1)) {
+                        // If the array index is constant, propagate the value directly
+                        sprintf(instructions[j].arg1, "%s", instructions[i].arg2);
+                        instructions[j].is_optimized = 1;
+                    }
+                }
+            }
+        } else if (strchr(instructions[i].arg1, '[')) {
+            // Handle array loads (e.g., arr[0]) and propagate known constant values
+            for (int j = i + 1; j < *num_instructions; j++) {
+                if (strcmp(instructions[j].result, instructions[i].arg1) == 0) {
+                    // If the array element value is known (from a previous assignment), replace it
+                    if (is_number(instructions[i].arg2)) {
+                        strcpy(instructions[j].arg1, instructions[i].arg2);
+                        instructions[j].is_optimized = 1;
+                    }
+                }
+            }
+        }
     }
 }
-
 
 
 void dead_code_elimination(TACInstruction* instructions, int* num_instructions) {
     int used_instructions[MAX_INSTRUCTIONS] = {0};
 
-    // Track dependencies
+    // Track if an instruction is used later
     for (int i = 0; i < *num_instructions; i++) {
         // Mark all instructions used in control flow as used
         if (strcmp(instructions[i].result, "ifFalse") == 0 ||
@@ -204,6 +235,7 @@ void dead_code_elimination(TACInstruction* instructions, int* num_instructions) 
         
         // Original dependency tracking
         if (!instructions[i].is_dead && !instructions[i].is_preserved) {
+
             for (int j = i + 1; j < *num_instructions; j++) {
                 if (strcmp(instructions[j].arg1, instructions[i].result) == 0 ||
                     strcmp(instructions[j].arg2, instructions[i].result) == 0 ||
@@ -217,6 +249,7 @@ void dead_code_elimination(TACInstruction* instructions, int* num_instructions) 
     }
 
     // Mark instructions as dead
+
     for (int i = 0; i < *num_instructions; i++) {
         if (!used_instructions[i] && !instructions[i].is_preserved) {
             instructions[i].is_dead = 1;
@@ -224,8 +257,6 @@ void dead_code_elimination(TACInstruction* instructions, int* num_instructions) 
         }
     }
 }
-
-
 
 
 void write_TAC(const char* filename, TACInstruction* instructions, int num_instructions) {
@@ -257,26 +288,14 @@ void write_TAC(const char* filename, TACInstruction* instructions, int num_instr
 
 void optimize_TAC(const char* input_filename, const char* output_filename) {
     TACInstruction instructions[MAX_INSTRUCTIONS];
-
     int num_instructions = read_TAC(input_filename, instructions);
     if (num_instructions == -1) {
         return;
     }
 
-    printf("Initial TAC:\n");
-    print_instructions(instructions, num_instructions);
-
     constant_folding(instructions, &num_instructions);
-    printf("After constant folding:\n");
-    print_instructions(instructions, num_instructions);
-
     algebraic_simplification(instructions, &num_instructions);
-    printf("After algebraic simplification:\n");
-    print_instructions(instructions, num_instructions);
-
     copy_propagation(instructions, &num_instructions);
-    printf("After copy propagation:\n");
-    print_instructions(instructions, num_instructions);
 
     // Mark print instructions as preserved
     for (int i = 0; i < num_instructions; i++) {
@@ -323,12 +342,9 @@ void optimize_TAC(const char* input_filename, const char* output_filename) {
     }
 
     dead_code_elimination(instructions, &num_instructions);
-    printf("After dead code elimination:\n");
-    print_instructions(instructions, num_instructions);
 
     write_TAC(output_filename, instructions, num_instructions);
 }
-
 
 
 void print_instructions(TACInstruction* instructions, int num_instructions) {

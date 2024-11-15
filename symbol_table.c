@@ -68,6 +68,7 @@ void insert_array_symbol(char *name, char *type, int size, char *scope) {
     symbol_count++;
 }
 
+
 // Add this function implementation
 void update_symbol_value(char* name, char* value) {
     Symbol* entry = lookup_symbol(name);
@@ -75,8 +76,6 @@ void update_symbol_value(char* name, char* value) {
         entry->type = strdup(value);  // Using the 'type' field to store the value
     }
 }
-
-
 
 
 

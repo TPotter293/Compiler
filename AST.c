@@ -237,6 +237,7 @@ ASTNode* createBinaryOpNode(char* op, ASTNode* left, ASTNode* right) {
     return node;
 }
 
+
 // Example usage in processing expressions
 void processExpression(ASTNode* node) {
     if (!node) return;
@@ -262,7 +263,16 @@ void processExpression(ASTNode* node) {
                    node->op); // Ensure op is set correctly
             break;
 
-       case NODE_TYPE_INTEGER:
+
+        case NODE_TYPE_INTEGER:
+            // Directly use the number value
+            node->temp_var_name = generateTempVariable();
+            printf("TAC: %s = %d\n", 
+                   node->temp_var_name, 
+                   node->value);
+            break;
+        case NODE_TYPE_FLOAT:
+
             // Directly use the number value
             node->temp_var_name = generateTempVariable();
             printf("TAC: %s = %d\n", 
@@ -466,6 +476,16 @@ ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments) {
     return node;
 }
 
+
+// Create a function call node
+ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments) {
+    ASTNode* node = createNode();
+    node->type = NODE_TYPE_FUNCTION_CALL;
+    node->id = strdup(identifier);
+    node->funcCall.arguments = arguments;
+    return node;
+}
+
 // Create an argument list node
 ASTNode* createArgumentListNode(ASTNode** args, int count) {
     ASTNode* node = createNode();
@@ -482,6 +502,7 @@ ASTNode* createArgumentListNode(ASTNode** args, int count) {
     }
     return node;
 }
+
 ASTNode* createArrayDeclarationNode(ASTNode* identifier, char* typeNode, int arraySize) {
     ASTNode* node = createNode();
     node->type = NODE_TYPE_ARRAY_DECLARATION;
@@ -496,7 +517,8 @@ ASTNode* createArrayAccessNode(ASTNode* identifier, ASTNode* indexNode) {
     ASTNode* node = createNode(); 
     node->type = NODE_TYPE_ARRAY_ACCESS;
     node->id  = identifier;        // Identifier (array name)
-    node->value.intValue = indexNode;    // Index to access
+    node->value.intValue = indexNode;
+    node->arrayIndex;    // Index to access
 
     return node;
 }
@@ -505,7 +527,7 @@ ASTNode* createArrayAssignmentNode(char* id, ASTNode* index, ASTNode* value) {
     ASTNode* node = createNode();  // Create a new node
     node->type = NODE_TYPE_ARRAY_ASSIGNMENT;  // Set the node type
     node->id = strdup(id);  // Store the identifier for the array
-    node->arrayIndex = index;  // Store the index expression
+    node->value.intValue = index->value.intValue;  // Store the index expression
     node->assignedValue = value;  // Store the value to assign
     return node;  // Return the created node
 }

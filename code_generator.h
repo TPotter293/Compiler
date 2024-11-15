@@ -14,7 +14,7 @@ void generateCode(const char* tac_filename, FILE* output_file);
 void readTACFile(const char* filename);
 void generateTACCode(FILE* output_file);
 void generateAssignmentCode(TACInstruction* instr, FILE* output_file);
-void generateWriteCode(const char* arg, FILE* output_file);
+void generateWriteCode(TACInstruction* instr, FILE* output_file);
 void generateBinaryOpCode(TACInstruction* instr, FILE* output_file);
 
 int is_number_cg(const char* str);
