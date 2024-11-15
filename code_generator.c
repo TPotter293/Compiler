@@ -24,6 +24,9 @@ void generateCode(const char* tac_filename, FILE* output_file) {
     fprintf(output_file, ".globl main\n");
     fprintf(output_file, "main:\n");
 
+    // Add this line to initialize stack pointer
+    fprintf(output_file, "addi $sp, $sp, -100\n");  // Allocate stack space
+
     printf("Generating code from TAC file: %s\n", tac_filename);
     readTACFile(tac_filename);
     generateTACCode(output_file);
@@ -71,6 +74,22 @@ void generateTACCode(FILE* output_file) {
         TACInstruction* instr = &tac_instructions[i];
         if (strcmp(instr->result, "print") == 0) {
             generateWriteCode(instr->arg1, output_file);
+        } else if (strncmp(instr->result, "f", 1) == 0) {
+ // Generate comparison code
+    int offset1 = getVariableLocation(instr->arg1);
+    int offset2 = getVariableLocation(instr->arg2);
+    fprintf(output_file, "lw $t1, %d($sp)\n", offset1);    // Load x
+    fprintf(output_file, "lw $t2, %d($sp)\n", offset2);    // Load y
+    fprintf(output_file, "slt $t0, $t2, $t1\n");          // Set if y < x (same as x > y)
+    fprintf(output_file, "sw $t0, %d($sp)\n", getVariableLocation(instr->result));
+        } else if (strcmp(instr->result, "ifFalse") == 0) {
+    // Load condition result and branch
+    int offset = getVariableLocation(instr->arg1);
+    fprintf(output_file, "lw $t0, %d($sp)\n", offset);
+    fprintf(output_file, "beq $t0, $zero, %s\n", instr->arg2);  // Branch to label
+        } else if (strcmp(instr->result, "label") == 0) {
+            fprintf(output_file, "%s:\n", instr->arg1);
+            printf("Generated label: %s\n", instr->arg1);
         } else if (instr->op[0] != '\0') {
             generateBinaryOpCode(instr, output_file);
         } else {
@@ -80,14 +99,20 @@ void generateTACCode(FILE* output_file) {
     printf("TAC code generation completed.\n");
 }
 
+
+
+
+
+
+
 void generateAssignmentCode(TACInstruction* instr, FILE* output_file) {
     printf("Generating assignment code for: %s = %s\n", instr->result, instr->arg1);
-    if (is_float(instr->arg1)) {
-        fprintf(output_file, "li.s $f0, %s\n", instr->arg1);
-        printf("Loaded float literal into $f0: %s\n", instr->arg1);
-    } else if (is_int(instr->arg1)) {
+    if (is_int(instr->arg1)) {
         fprintf(output_file, "li $t0, %s\n", instr->arg1);
         printf("Loaded integer literal into $t0: %s\n", instr->arg1);
+    } else if (is_float(instr->arg1)) {
+        fprintf(output_file, "li.s $f0, %s\n", instr->arg1);
+        printf("Loaded float literal into $f0: %s\n", instr->arg1);
     } else {
         // Load variable value
         int offset = getVariableLocation(instr->arg1);
@@ -205,13 +230,24 @@ int is_int(const char* str) {
 
 int is_float(const char* str) {
     char* endptr;
-    
+
     // Use strtof to convert the string to a float
     strtof(str, &endptr);
-    
+
     // Check if the conversion consumed the entire string
-    // Also check for the presence of a decimal point
-    int result = (*endptr == '\0') && (strchr(str, '.') != NULL || str != endptr);
+    // Check for the presence of a decimal point and ensure there are digits after it
+    int result = (*endptr == '\0') && (strchr(str, '.') != NULL);
+
+    // Additional check to ensure there are digits after the decimal point
+    if (result) {
+        char* decimal_point = strchr(str, '.');
+        if (decimal_point != NULL) {
+            if (strlen(decimal_point) == 1 || !isdigit(*(decimal_point + 1))) {
+                result = 0; // No digits after the decimal point
+            }
+        }
+    }
+
     printf("is_float(%s) = %d\n", str, result);
     return result;
 }
