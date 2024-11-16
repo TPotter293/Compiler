@@ -273,7 +273,7 @@ void write_TAC(const char* filename, TACInstruction* instructions, int num_instr
             } else if (strcmp(instructions[i].result, "ifFalse") == 0) {
                 fprintf(file, "ifFalse %s goto %s\n", instructions[i].arg1, instructions[i].arg2);
             } else if (strcmp(instructions[i].result, "label") == 0) {
-                fprintf(file, "label %s:\n", instructions[i].arg1);
+                fprintf(file, "label %s\n", instructions[i].arg1);
             } else if (instructions[i].op[0] != '\0') {
                 fprintf(file, "%s = %s %s %s\n", instructions[i].result, instructions[i].arg1, instructions[i].op, instructions[i].arg2);
             } else {

@@ -1,0 +1,9 @@
+int x;
+int y;
+
+x = 5;
+y = 10;
+
+if (y > x) {
+    write 1;
+}

@@ -698,7 +698,7 @@ void analyzeNode(ASTNode* node) {
             analyzeNode(node->right);
             
             // Generate label for skipping the if body
-            sprintf(tac_line, "label %s:", skipLabel);
+            sprintf(tac_line, "label %s", skipLabel);
             generateTACLine(tac_line);
             break;
 

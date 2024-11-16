@@ -61,6 +61,19 @@ void readTACFile(const char* filename) {
             instr->arg2[0] = '\0';
             printf("Parsed print instruction: %s\n", instr->arg1);
             tac_instruction_count++;
+        } else if (sscanf(line, "ifFalse %s goto %s", instr->arg1, instr->arg2) == 2) {
+            strcpy(instr->result, "ifFalse");
+            instr->op[0] = '\0';
+            printf("Parsed ifFalse instruction: %s goto %s\n", instr->arg1, instr->arg2);
+            tac_instruction_count++;
+        } else if (sscanf(line, "label %s::", instr->arg1) == 1) {
+            // Label instruction
+            strcpy(instr->result, "label");  // Set result to "label"
+            instr->op[0] = '\0';             // Clear out op
+            instr->arg2[0] = '\0';           // Clear out arg2
+            printf("Parsed label: %s\n", instr->arg1);  // Show label name
+            tac_instruction_count++;
+
         }
     }
 
@@ -72,21 +85,31 @@ void generateTACCode(FILE* output_file) {
     printf("Generating TAC code...\n");
     for (int i = 0; i < tac_instruction_count; i++) {
         TACInstruction* instr = &tac_instructions[i];
+        printf("####### Instruction %d: result='%s', arg1='%s', op='%s', arg2='%s'\n", 
+                i, 
+                instr->result, 
+                instr->arg1, 
+                instr->op, 
+                instr->arg2);
+
         if (strcmp(instr->result, "print") == 0) {
             generateWriteCode(instr->arg1, output_file);
         } else if (strncmp(instr->result, "f", 1) == 0) {
- // Generate comparison code
-    int offset1 = getVariableLocation(instr->arg1);
-    int offset2 = getVariableLocation(instr->arg2);
-    fprintf(output_file, "lw $t1, %d($sp)\n", offset1);    // Load x
-    fprintf(output_file, "lw $t2, %d($sp)\n", offset2);    // Load y
-    fprintf(output_file, "slt $t0, $t2, $t1\n");          // Set if y < x (same as x > y)
-    fprintf(output_file, "sw $t0, %d($sp)\n", getVariableLocation(instr->result));
+            // Generate comparison code
+            int offset1 = getVariableLocation(instr->arg1);
+            int offset2 = getVariableLocation(instr->arg2);
+            fprintf(output_file, "lw $t1, %d($sp)\n", offset1);    // Load x
+            fprintf(output_file, "lw $t2, %d($sp)\n", offset2);    // Load y
+            fprintf(output_file, "slt $t0, $t2, $t1\n");          // Set if y < x (same as x > y)
+            fprintf(output_file, "sw $t0, %d($sp)\n", getVariableLocation(instr->result));
         } else if (strcmp(instr->result, "ifFalse") == 0) {
-    // Load condition result and branch
-    int offset = getVariableLocation(instr->arg1);
-    fprintf(output_file, "lw $t0, %d($sp)\n", offset);
-    fprintf(output_file, "beq $t0, $zero, %s\n", instr->arg2);  // Branch to label
+            // Load condition value into $t0
+            int offset = getVariableLocation(instr->arg1);
+            fprintf(output_file, "lw $t0, %d($sp)\n", offset);
+
+            // Branch to the label if $t0 is zero
+            fprintf(output_file, "beq $t0, $zero, %s\n", instr->arg2);
+            printf("Generated ifFalse: branch to %s if %s is 0\n", instr->arg2, instr->arg1);
         } else if (strcmp(instr->result, "label") == 0) {
             fprintf(output_file, "%s:\n", instr->arg1);
             printf("Generated label: %s\n", instr->arg1);
@@ -98,10 +121,6 @@ void generateTACCode(FILE* output_file) {
     }
     printf("TAC code generation completed.\n");
 }
-
-
-
-
 
 
 
