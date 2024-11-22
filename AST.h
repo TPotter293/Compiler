@@ -41,6 +41,7 @@ typedef struct ASTNode {
     char* id;       // For identifiers
     struct ASTNode* left;    // Left child
     struct ASTNode* right;   // Right child
+    struct ASTNode* elseNode;
     int temp_var;         // <-- Add this line to store the temporary variable number.
     char* temp_var_name;  // New field to store the temporary variable name
     char* boolean_val;   // true or false

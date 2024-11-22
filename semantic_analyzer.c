@@ -686,20 +686,35 @@ void analyzeNode(ASTNode* node) {
         case NODE_TYPE_IF:
             // Analyze the condition
             analyzeNode(node->left);
-            
+
             // Generate TAC for if statement with proper conditional branching
-            char* skipLabel = newTemp();
-            
+            char* skipLabel = newTemp();  // Label for skipping the if block
+            char* endLabel = newTemp();   // Label for the end of the entire if-else block
+
             // Generate conditional jump - skip if condition is false
             sprintf(tac_line, "ifFalse %s goto %s", node->left->temp_var_name, skipLabel);
             generateTACLine(tac_line);
-            
+
             // Analyze the if body
             analyzeNode(node->right);
-            
+
+            // Jump to the end of the if-else block after executing the if body
+            sprintf(tac_line, "j %s", endLabel);
+            generateTACLine(tac_line);
+
             // Generate label for skipping the if body
             sprintf(tac_line, "label %s", skipLabel);
             generateTACLine(tac_line);
+
+            // Analyze the else body
+            if (node->elseNode != NULL) {
+                analyzeNode(node->elseNode);
+            }
+
+            // Generate label for the end of the if-else block
+            sprintf(tac_line, "label %s", endLabel);
+            generateTACLine(tac_line);
+
             break;
 
 

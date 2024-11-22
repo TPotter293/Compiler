@@ -73,8 +73,8 @@ char** extractParamTypes(ASTNode** params, int count) {
 %token <strval> TYPE IDENTIFIER BOOLVAL
 %token <char> SEMICOLON EQ PLUS MINUS MULT DIVIDE
 %token <char> NOT LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE COMMA
-%token LT
-%token GT
+%token LT GT EQTO NEQTO AND OR NOT
+
 
 
 %type <node> program statements statement expression declaration assignment write_statement if_statement return_statement function_declaration variable_declaration parameter_list parameters argument_list
@@ -221,8 +221,8 @@ function_declaration:
 
 
         // Add the function declaration to the program's AST
-printf("DEBUG: About to add function declaration to AST\n");
-printf("DEBUG: Root node address: %p\n", (void*)root);
+        printf("DEBUG: About to add function declaration to AST\n");
+        printf("DEBUG: Root node address: %p\n", (void*)root);
         if (root == NULL) {
             printf("DEBUG: Creating new program node as root\n");
             ASTNode* stmtNode = createStatementsNode(&$$, 1);
@@ -266,14 +266,7 @@ printf("DEBUG: Root node address: %p\n", (void*)root);
 
 
 
-
-
-
-
-
-
-    parameter_list:
-
+parameter_list:
     parameters
     | /* empty */
     {
@@ -369,7 +362,16 @@ expression:
         $$ = createBinaryOpNode(">", $1, $3);
         printf("Greater than expression parsed.\n");
     }
-
+    | expression EQTO expression
+    {
+        $$ = createBinaryOpNode("==", $1, $3);
+        printf("Equal to expression parsed.\n");
+    }
+    | expression NEQTO expression
+    {
+        $$ = createBinaryOpNode("!=", $1, $3);
+        printf("Not Equal ot expression parsed.\n");
+    }
     | IDENTIFIER
     {
         $$ = createIdentifierNode($1);
@@ -588,7 +590,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Error opening output file\n");
         return 1;
     }
-    generateCode("optimized.tac", output_file);
+    generateCode("output.tac", output_file);
 
     fclose(output_file);
 

@@ -207,6 +207,16 @@ ws          {delim}+
                 return GT;
               }
 
+"=="          { chars++;
+                printf("%s : GT\n", yytext);
+                return EQTO;
+              }
+
+"!="          { chars++;
+                printf("%s : GT\n", yytext);
+                return NEQTO;
+              }
+
 \n {lines++; chars = 0;}
 [ \t]+       { chars += yyleng; } // Count all whitespace characters
 

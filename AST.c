@@ -164,6 +164,7 @@ ASTNode* createIfNode(ASTNode* cond, ASTNode* thenStmt, ASTNode* elseStmt) {
     node->left = cond; // Condition stored in left
     node->right = thenStmt; // Then statement stored in right
     // Assuming elseStmt would be handled differently or stored in another field if needed
+    node->elseNode = elseStmt;
     return node;
 }
 

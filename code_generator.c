@@ -73,7 +73,13 @@ void readTACFile(const char* filename) {
             instr->arg2[0] = '\0';           // Clear out arg2
             printf("Parsed label: %s\n", instr->arg1);  // Show label name
             tac_instruction_count++;
-
+        } else if (sscanf(line, "j %s", instr->arg1) == 1) {
+            // Jump instruction
+            strcpy(instr->result, "j");  // Set result to "j"
+            instr->op[0] = '\0';         // Clear out op
+            instr->arg2[0] = '\0';       // Clear out arg2
+            printf("Parsed jump: j %s\n", instr->arg1);  // Log the jump
+            tac_instruction_count++;
         }
     }
 
@@ -100,7 +106,22 @@ void generateTACCode(FILE* output_file) {
             int offset2 = getVariableLocation(instr->arg2);
             fprintf(output_file, "lw $t1, %d($sp)\n", offset1);    // Load x
             fprintf(output_file, "lw $t2, %d($sp)\n", offset2);    // Load y
-            fprintf(output_file, "slt $t0, $t2, $t1\n");          // Set if y < x (same as x > y)
+
+            if (strcmp(instr->op, "<") == 0) {
+                fprintf(output_file, "slt $t0, $t1, $t2\n");
+            }else if (strcmp(instr->op, ">") == 0) {
+                fprintf(output_file, "slt $t0, $t2, $t1\n");
+            } else if (strcmp(instr->op, "==") == 0) {
+                fprintf(output_file, "sub $t3, $t1, $t2\n");       // t3 = t1 - t2
+                fprintf(output_file, "seq $t0, $t3, $zero\n");     // t0 = (t3 == 0)
+            } else if (strcmp(instr->op, "!=") == 0) {
+                fprintf(output_file, "sub $t3, $t1, $t2\n");       // t3 = t1 - t2
+                fprintf(output_file, "sne $t0, $t3, $zero\n");     // t0 = (t3 != 0)
+            } else {
+                fprintf(stderr, "Unsupported comparison operator: %s\n", instr->op);
+                exit(1);
+            }
+
             fprintf(output_file, "sw $t0, %d($sp)\n", getVariableLocation(instr->result));
         } else if (strcmp(instr->result, "ifFalse") == 0) {
             // Load condition value into $t0
@@ -113,6 +134,10 @@ void generateTACCode(FILE* output_file) {
         } else if (strcmp(instr->result, "label") == 0) {
             fprintf(output_file, "%s:\n", instr->arg1);
             printf("Generated label: %s\n", instr->arg1);
+        } else if (strcmp(instr->result, "j") == 0) {
+            // Handle unconditional jump
+            fprintf(output_file, "j %s\n", instr->arg1);
+            printf("Generated jump: jump to %s\n", instr->arg1);
         } else if (instr->op[0] != '\0') {
             generateBinaryOpCode(instr, output_file);
         } else {
@@ -121,6 +146,7 @@ void generateTACCode(FILE* output_file) {
     }
     printf("TAC code generation completed.\n");
 }
+
 
 
 
