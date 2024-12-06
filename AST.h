@@ -41,6 +41,7 @@ typedef struct ASTNode {
     char* id;       // For identifiers
     struct ASTNode* left;    // Left child
     struct ASTNode* right;   // Right child
+    struct ASTNode* elseNode;
     int temp_var;         // <-- Add this line to store the temporary variable number.
     char* temp_var_name;  // New field to store the temporary variable name
     char* boolean_val;   // true or false
@@ -105,7 +106,6 @@ ASTNode* createFunctionDeclarationNode(ASTNode* identifier, ASTNode* parameters,
 ASTNode* createFunctionPrototypeNode(ASTNode* identifier, ASTNode* parameters, ASTNode* returnType);
 ASTNode* createParameterNode(ASTNode* identifier, ASTNode* type);
 
-ASTNode* createParametersNode(ASTNode* parameter, int count);
 ASTNode* createParametersNode(ASTNode** params, int count);
 
 ASTNode* createArrayDeclarationNode(ASTNode* identifier, char* typeNode, int arraySize);
