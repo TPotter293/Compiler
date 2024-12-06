@@ -46,6 +46,7 @@ ASTNode* createNode() {
     }
     
     // Initialize all fields
+    memset(node, 0, sizeof(ASTNode));  // Zero out all memory first
     node->type = NODE_TYPE_UNDEFINED; // Set to a default or undefined value
     node->op = NULL;                   // Initialize operator to NULL
     node->value.intValue = 0; 
@@ -53,6 +54,7 @@ ASTNode* createNode() {
     node->id = NULL;                   // Initialize identifier to NULL
     node->left = NULL;                 // Initialize left child
     node->right = NULL;                // Initialize right child
+     node->elseNode = NULL;  // Make sure this is initialized
     node->temp_var = -1;               // Default for temp_var (indicate uninitialized)
     node->temp_var_name = NULL;        // Initialize temporary variable name to NULL
     node->boolean_val = NULL;          // Initialize boolean value to NULL
@@ -160,10 +162,16 @@ ASTNode* createWriteNode(ASTNode* expr) {
 // Create an if node
 ASTNode* createIfNode(ASTNode* cond, ASTNode* thenStmt, ASTNode* elseStmt) {
     ASTNode* node = createNode();
+      if (!node) return NULL;
     node->type = NODE_TYPE_IF; // Set node type
     node->left = cond; // Condition stored in left
     node->right = thenStmt; // Then statement stored in right
     // Assuming elseStmt would be handled differently or stored in another field if needed
+    node->elseNode = elseStmt;
+
+        // Debug output to verify node creation
+    printf("DEBUG: Created IF node - condition: %p, then: %p, else: %p\n", 
+           (void*)cond, (void*)thenStmt, (void*)elseStmt);
     return node;
 }
 
@@ -222,17 +230,20 @@ ASTNode* createBinaryOpNode(char* op, ASTNode* left, ASTNode* right) {
     printf("DEBUG: Creating binary op node with op '%s'\n", op ? op : "NULL");
     ASTNode* node = createNode();
     node->type = NODE_TYPE_BINARY_OP; // Set node type
-    if (op) {
+    /*if (op) {
         node->op = strdup(op);
-    }
+    }*/
+    node->op = op ? strdup(op) : NULL;
     node->left = left;  // Set left operand
     node->right = right; // Set right operand
 
     // Generate a temporary variable for the result
     node->temp_var_name = generateTempVariable();
 
-    // Log the temporary variable creation
-    printf("DEBUG: Temporary variable created for binary op: %s\n", node->temp_var_name);
+    // Validate the created node
+    printf("DEBUG: Binary op node created - op: %s\n", node->op);
+    printf("DEBUG: Left operand type: %s\n", typeToString(left->type));
+    printf("DEBUG: Right operand type: %s\n", typeToString(right->type));
 
     return node;
 }
@@ -273,13 +284,6 @@ void processExpression(ASTNode* node) {
             break;
         case NODE_TYPE_FLOAT:
 
-            // Directly use the number value
-            node->temp_var_name = generateTempVariable();
-            printf("TAC: %s = %d\n", 
-                   node->temp_var_name, 
-                   node->value);
-            break;
-        case NODE_TYPE_FLOAT:
             // Directly use the number value
             node->temp_var_name = generateTempVariable();
             printf("TAC: %s = %d\n", 
@@ -477,15 +481,6 @@ ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments) {
 }
 
 
-// Create a function call node
-ASTNode* createFunctionCallNode(char* identifier, ASTNode* arguments) {
-    ASTNode* node = createNode();
-    node->type = NODE_TYPE_FUNCTION_CALL;
-    node->id = strdup(identifier);
-    node->funcCall.arguments = arguments;
-    return node;
-}
-
 // Create an argument list node
 ASTNode* createArgumentListNode(ASTNode** args, int count) {
     ASTNode* node = createNode();
@@ -555,6 +550,14 @@ void printAST(ASTNode* node, int indentLevel) {
         printf("  ");  // Indentation for readability
     }
 
+      // Add validation check
+    if (node->type < 0 || node->type > NODE_TYPE_ARRAY_ASSIGNMENT) {
+        printf("Invalid node type: %d\n", node->type);
+        return;
+    }
+
+    printf("DEBUG: Node type: %s\n", typeToString(node->type));
+
     switch (node->type) {
         case NODE_TYPE_PROGRAM:
 
@@ -601,8 +604,16 @@ void printAST(ASTNode* node, int indentLevel) {
             printf("DEBUG: Boolean value: %s\n", node->value.intValue ? "true" : "false");
             break;
         case NODE_TYPE_BINARY_OP:
-            printf("DEBUG: Node type: Binary Operator\n");
-            printf("DEBUG: Operator value: %s\n", node->op);
+           printf("DEBUG: Node type: Binary Operator\n");
+            if (node->op) {
+                printf("DEBUG: Operator value: %s\n", node->op);
+            }
+            if (node->left) {
+                printAST(node->left, indentLevel + 1);
+            }
+            if (node->right) {
+                printAST(node->right, indentLevel + 1);
+            }
             break;
         case NODE_TYPE_UNARY_OP:
             printf("DEBUG: Node type: Unary Operator\n");
@@ -646,6 +657,25 @@ void freeIdentifier(ASTNode* node) {
 
 void freeNode(ASTNode* node) {
     if (!node) return;
+
+    // Free operator string if it exists
+    if (node->op) {
+        free(node->op);
+        node->op = NULL;
+    }
+
+    // Free temporary variable name if it exists
+    if (node->temp_var_name) {
+        free(node->temp_var_name);
+        node->temp_var_name = NULL;
+    }
+
+    
+    // Free identifier if it exists
+    if (node->id) {
+        free(node->id);
+        node->id = NULL;
+    }
 
     // Free child nodes
     if (node->left) {
