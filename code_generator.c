@@ -6,6 +6,7 @@
 
 #define MAX_VARIABLES 100
 #define MAX_TAC_INSTRUCTIONS 1000
+#define MAX_LABELS 100
 
 struct {
     char* name;
@@ -14,8 +15,27 @@ struct {
 } variables[MAX_VARIABLES];
 int variable_count = 0;
 
+struct {
+    char original[20];
+    char unique[20];
+} label_map[MAX_LABELS];
+int label_map_count = 0;
+static int label_counter = 0;
+
+
 TACInstruction tac_instructions[MAX_TAC_INSTRUCTIONS];
 int tac_instruction_count = 0;
+
+char* getUniqueLabel(const char* original) {
+    for (int i = 0; i < label_map_count; i++) {
+        if (strcmp(label_map[i].original, original) == 0) {
+            return label_map[i].unique;
+        }
+    }
+    strcpy(label_map[label_map_count].original, original);
+    sprintf(label_map[label_map_count].unique, "L%d", label_counter++);
+    return label_map[label_map_count++].unique;
+}
 
 void generateCode(const char* tac_filename, FILE* output_file) {
     fprintf(output_file, ".data\n");
@@ -61,6 +81,25 @@ void readTACFile(const char* filename) {
             instr->arg2[0] = '\0';
             printf("Parsed print instruction: %s\n", instr->arg1);
             tac_instruction_count++;
+        } else if (sscanf(line, "ifFalse %s goto %s", instr->arg1, instr->arg2) == 2) {
+            strcpy(instr->result, "ifFalse");
+            instr->op[0] = '\0';
+            printf("Parsed ifFalse instruction: %s goto %s\n", instr->arg1, instr->arg2);
+            tac_instruction_count++;
+        } else if (sscanf(line, "label %s::", instr->arg1) == 1) {
+            // Label instruction
+            strcpy(instr->result, "label");  // Set result to "label"
+            instr->op[0] = '\0';             // Clear out op
+            instr->arg2[0] = '\0';           // Clear out arg2
+            printf("Parsed label: %s\n", instr->arg1);  // Show label name
+            tac_instruction_count++;
+        } else if (sscanf(line, "j %s", instr->arg1) == 1) {
+            // Jump instruction
+            strcpy(instr->result, "j");  // Set result to "j"
+            instr->op[0] = '\0';         // Clear out op
+            instr->arg2[0] = '\0';       // Clear out arg2
+            printf("Parsed jump: j %s\n", instr->arg1);  // Log the jump
+            tac_instruction_count++;
         }
     }
 
@@ -72,24 +111,47 @@ void generateTACCode(FILE* output_file) {
     printf("Generating TAC code...\n");
     for (int i = 0; i < tac_instruction_count; i++) {
         TACInstruction* instr = &tac_instructions[i];
+        printf("####### Instruction %d: result='%s', arg1='%s', op='%s', arg2='%s'\n",
+                i, instr->result, instr->arg1, instr->op, instr->arg2);
+
         if (strcmp(instr->result, "print") == 0) {
             generateWriteCode(instr->arg1, output_file);
         } else if (strncmp(instr->result, "f", 1) == 0) {
- // Generate comparison code
-    int offset1 = getVariableLocation(instr->arg1);
-    int offset2 = getVariableLocation(instr->arg2);
-    fprintf(output_file, "lw $t1, %d($sp)\n", offset1);    // Load x
-    fprintf(output_file, "lw $t2, %d($sp)\n", offset2);    // Load y
-    fprintf(output_file, "slt $t0, $t2, $t1\n");          // Set if y < x (same as x > y)
-    fprintf(output_file, "sw $t0, %d($sp)\n", getVariableLocation(instr->result));
+            int offset1 = getVariableLocation(instr->arg1);
+            int offset2 = getVariableLocation(instr->arg2);
+            fprintf(output_file, "lw $t1, %d($sp)\n", offset1);
+            fprintf(output_file, "lw $t2, %d($sp)\n", offset2);
+
+            if (strcmp(instr->op, "<") == 0) {
+                fprintf(output_file, "slt $t0, $t1, $t2\n");
+            } else if (strcmp(instr->op, ">") == 0) {
+                fprintf(output_file, "slt $t0, $t2, $t1\n");
+            } else if (strcmp(instr->op, "==") == 0) {
+                fprintf(output_file, "sub $t3, $t1, $t2\n");
+                fprintf(output_file, "seq $t0, $t3, $zero\n");
+            } else if (strcmp(instr->op, "!=") == 0) {
+                fprintf(output_file, "sub $t3, $t1, $t2\n");
+                fprintf(output_file, "sne $t0, $t3, $zero\n");
+            } else {
+                fprintf(stderr, "Unsupported comparison operator: %s\n", instr->op);
+                exit(1);
+            }
+
+            fprintf(output_file, "sw $t0, %d($sp)\n", getVariableLocation(instr->result));
         } else if (strcmp(instr->result, "ifFalse") == 0) {
-    // Load condition result and branch
-    int offset = getVariableLocation(instr->arg1);
-    fprintf(output_file, "lw $t0, %d($sp)\n", offset);
-    fprintf(output_file, "beq $t0, $zero, %s\n", instr->arg2);  // Branch to label
+            int offset = getVariableLocation(instr->arg1);
+            fprintf(output_file, "lw $t0, %d($sp)\n", offset);
+            char* unique_label = getUniqueLabel(instr->arg2);
+            fprintf(output_file, "beq $t0, $zero, %s\n", unique_label);
+            printf("Generated ifFalse: branch to %s if %s is 0\n", unique_label, instr->arg1);
         } else if (strcmp(instr->result, "label") == 0) {
-            fprintf(output_file, "%s:\n", instr->arg1);
-            printf("Generated label: %s\n", instr->arg1);
+            char* unique_label = getUniqueLabel(instr->arg1);
+            fprintf(output_file, "%s:\n", unique_label);
+            printf("Generated label: %s\n", unique_label);
+        } else if (strcmp(instr->result, "j") == 0) {
+            char* unique_label = getUniqueLabel(instr->arg1);
+            fprintf(output_file, "j %s\n", unique_label);
+            printf("Generated jump: jump to %s\n", unique_label);
         } else if (instr->op[0] != '\0') {
             generateBinaryOpCode(instr, output_file);
         } else {
@@ -98,8 +160,6 @@ void generateTACCode(FILE* output_file) {
     }
     printf("TAC code generation completed.\n");
 }
-
-
 
 
 
@@ -135,24 +195,21 @@ void generateAssignmentCode(TACInstruction* instr, FILE* output_file) {
     }
 }
 
-void generateWriteCode(TACInstruction* instr, FILE* output_file) {
-    printf("Generating write code for: %s\n", instr->arg1);
-    if (is_float(instr->arg1)) {
-        int offset = getVariableLocation(instr->arg1);
-        fprintf(output_file, "li.s $f0, %s\n", instr->arg1);
+void generateWriteCode(const char* arg, FILE* output_file) {
+    printf("Generating write code for: %s\n", arg);
+    if (is_float(arg)) {
+        int offset = getVariableLocation(arg);
+        fprintf(output_file, "l.s $f0, %d($sp)\n", offset);
         fprintf(output_file, "li $v0, 2\n"); // Print float
-        printf("Preparing to print float variable: %s\n", instr->arg1);
     } else {
-        int offset = getVariableLocation(instr->arg1);
+        int offset = getVariableLocation(arg);
         fprintf(output_file, "lw $a0, %d($sp)\n", offset);
         fprintf(output_file, "li $v0, 1\n"); // Print integer
-        printf("Preparing to print integer variable: %s\n", instr->arg1);
     }
     fprintf(output_file, "syscall\n");
     fprintf(output_file, "la $a0, newline\n");
     fprintf(output_file, "li $v0, 4\n");
     fprintf(output_file, "syscall\n");
-    printf("Print syscall executed.\n");
 }
 
 void generateBinaryOpCode(TACInstruction* instr, FILE* output_file) {
