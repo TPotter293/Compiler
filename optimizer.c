@@ -60,22 +60,32 @@ int read_TAC(const char* filename, TACInstruction* instructions) {
             instructions[count].is_preserved = 0; // Initialize preservation flag
             
         } else if (strncmp(line, "ifFalse", 7) == 0) {
-    sscanf(line, "ifFalse %s goto %s", instructions[count].arg1, instructions[count].arg2);
-    strcpy(instructions[count].result, "ifFalse");
-    instructions[count].op[0] = '\0';
-    instructions[count].is_dead = 0;
-    instructions[count].is_optimized = 0;
-    instructions[count].is_preserved = 1;  // Preserve conditional jumps
-    count++;
+            sscanf(line, "ifFalse %s goto %s", instructions[count].arg1, instructions[count].arg2);
+            strcpy(instructions[count].result, "ifFalse");
+            instructions[count].op[0] = '\0';
+            instructions[count].is_dead = 0;
+            instructions[count].is_optimized = 0;
+            instructions[count].is_preserved = 1;  // Preserve conditional jumps
+            count++;
         }
         else if (strncmp(line, "label", 5) == 0) {
-            sscanf(line, "label %s:", instructions[count].arg1);
+            sscanf(line, "label %s", instructions[count].arg1);
             strcpy(instructions[count].result, "label");
             instructions[count].op[0] = '\0';
             instructions[count].arg2[0] = '\0';
             instructions[count].is_dead = 0;
             instructions[count].is_optimized = 0;
             instructions[count].is_preserved = 1;  // Preserve labels
+            count++;
+        }
+        else if (strncmp(line, "j", 1) == 0) {
+            sscanf(line, "j %s", instructions[count].arg1);
+            strcpy(instructions[count].result, "j");
+            instructions[count].op[0] = '\0';
+            instructions[count].arg2[0] = '\0';
+            instructions[count].is_dead = 0;
+            instructions[count].is_optimized = 0;
+            instructions[count].is_preserved = 1;  // Preserve jumps
             count++;
         }
 
@@ -274,6 +284,8 @@ void write_TAC(const char* filename, TACInstruction* instructions, int num_instr
                 fprintf(file, "ifFalse %s goto %s\n", instructions[i].arg1, instructions[i].arg2);
             } else if (strcmp(instructions[i].result, "label") == 0) {
                 fprintf(file, "label %s\n", instructions[i].arg1);
+            } else if (strcmp(instructions[i].result, "j") == 0) {
+                fprintf(file, "j %s\n", instructions[i].arg1);
             } else if (instructions[i].op[0] != '\0') {
                 fprintf(file, "%s = %s %s %s\n", instructions[i].result, instructions[i].arg1, instructions[i].op, instructions[i].arg2);
             } else {

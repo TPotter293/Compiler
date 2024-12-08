@@ -10,6 +10,7 @@ typedef enum {
     NODE_TYPE_ASSIGNMENT,
     NODE_TYPE_WRITE,
     NODE_TYPE_IF,
+    NODE_TYPE_WHILE,
     NODE_TYPE_RETURN,
     NODE_TYPE_INTEGER,
     NODE_TYPE_FLOAT,
@@ -94,6 +95,7 @@ ASTNode* createDeclarationNode(ASTNode* type, ASTNode* id);
 ASTNode* createAssignmentNode(ASTNode* id, ASTNode* expr);
 ASTNode* createWriteNode(ASTNode* expr);
 ASTNode* createIfNode(ASTNode* cond, ASTNode* thenStmt, ASTNode* elseStmt);
+ASTNode* createWhileNode(ASTNode* cond, ASTNode* stmts);
 ASTNode* createReturnNode(ASTNode* expr);
 ASTNode* createIntegerNode(int value);
 ASTNode* createFloatNode(float value);

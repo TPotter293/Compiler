@@ -716,7 +716,44 @@ void analyzeNode(ASTNode* node) {
             generateTACLine(tac_line);
 
             break;
+        case NODE_TYPE_WHILE:
 
+            // Catch infinite loops
+
+
+            char* condLabel = newTemp(); // loop condition label
+            char* exitLabel = newTemp(); // end loop label
+
+            // loop condition label
+            sprintf(tac_line, "label %s", condLabel);
+            generateTACLine(tac_line);
+
+            // analyze condition
+            analyzeNode(node->left);
+
+            // Generate conditional jump - skip if condition is false
+            sprintf(tac_line, "ifFalse %s goto %s", node->left->temp_var_name, exitLabel);
+            generateTACLine(tac_line);
+
+            // analyze statements
+            analyzeNode(node->right);
+
+            // analyze condition
+            analyzeNode(node->left);
+
+            // Generate conditional jump - skip if condition is false
+            sprintf(tac_line, "ifFalse %s goto %s", node->left->temp_var_name, exitLabel);
+            generateTACLine(tac_line);
+
+            // jump back to condition
+            sprintf(tac_line, "j %s", condLabel);
+            generateTACLine(tac_line);
+
+            // loop end label
+            sprintf(tac_line, "label %s", exitLabel);
+            generateTACLine(tac_line);
+
+            break;
 
         case NODE_TYPE_STATEMENT:
             // Process each statement in the block

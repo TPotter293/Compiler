@@ -67,17 +67,17 @@ char** extractParamTypes(ASTNode** params, int count) {
     struct ASTNode* node;     // For AST nodes
 }
 
-%token WRITE IF ELSE RETURN FUNCTION VAR
+%token WRITE IF ELSE RETURN WHILE FUNCTION VAR
 %token <intval> INT 
 %token <floatval> FLOAT
 %token <strval> TYPE IDENTIFIER BOOLVAL
 %token <char> SEMICOLON EQ PLUS MINUS MULT DIVIDE
-%token <char> NOT LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE COMMA
+%token <char> LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE COMMA
 %token LT GT EQTO NEQTO AND OR NOT
 
 
 
-%type <node> program statements statement expression declaration assignment write_statement if_statement return_statement function_declaration variable_declaration parameter_list parameters argument_list
+%type <node> program statements statement expression declaration assignment write_statement if_statement while_statement return_statement function_declaration variable_declaration parameter_list parameters argument_list
 
 %left OR
 %left AND
@@ -135,6 +135,11 @@ statement:
     {
         $$ = $1;
         printf("If statement parsed.\n");
+    }
+    | while_statement
+    {
+        $$ = $1;
+        printf("While statement parsed.\n");
     }
     | return_statement
     {
@@ -332,6 +337,13 @@ if_statement:
         printf("If-else statement parsed.\n");
     }
     ;
+
+while_statement:
+    WHILE LPAREN expression RPAREN LBRACE statements RBRACE
+    {
+        $$ = createWhileNode($3, $6);
+        printf("while statements parsed.\n");
+    }
 
 return_statement:
     RETURN expression SEMICOLON

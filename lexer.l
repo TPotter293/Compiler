@@ -132,6 +132,13 @@ ws          {delim}+
                 return RETURN;
               }
 
+
+"while"     { words++; chars += strlen(yytext);
+                printf("%s : WHILE\n", yytext);
+                yylval.strval = strdup(yytext);
+                return WHILE;
+              }
+
 %{
 	// Recognize identifiers
 %}

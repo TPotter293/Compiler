@@ -117,8 +117,11 @@ void generateTACCode(FILE* output_file) {
             } else if (strcmp(instr->op, "!=") == 0) {
                 fprintf(output_file, "sub $t3, $t1, $t2\n");       // t3 = t1 - t2
                 fprintf(output_file, "sne $t0, $t3, $zero\n");     // t0 = (t3 != 0)
+            } else if (strcmp(instr->op, "+") == 0 || strcmp(instr->op, "-") == 0 ||
+                        strcmp(instr->op, "*") == 0|| strcmp(instr->op, "/") == 0) {
+                generateBinaryOpCode(instr, output_file);
             } else {
-                fprintf(stderr, "Unsupported comparison operator: %s\n", instr->op);
+                fprintf(stderr, "Unsupported operator: %s\n", instr->op);
                 exit(1);
             }
 

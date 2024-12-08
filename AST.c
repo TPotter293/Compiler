@@ -17,6 +17,7 @@ const char* typeToString(NodeType type) {
         case NODE_TYPE_ASSIGNMENT: return "assignment";
         case NODE_TYPE_WRITE: return "write";
         case NODE_TYPE_IF: return "if";
+        case NODE_TYPE_WHILE: return "while";
         case NODE_TYPE_RETURN: return "return";
         case NODE_TYPE_INTEGER: return "int";
         case NODE_TYPE_FLOAT: return "float";
@@ -165,6 +166,14 @@ ASTNode* createIfNode(ASTNode* cond, ASTNode* thenStmt, ASTNode* elseStmt) {
     node->right = thenStmt; // Then statement stored in right
     // Assuming elseStmt would be handled differently or stored in another field if needed
     node->elseNode = elseStmt;
+    return node;
+}
+
+ASTNode* createWhileNode(ASTNode* cond, ASTNode* stmts) {
+    ASTNode* node = createNode();
+    node->type = NODE_TYPE_WHILE;
+    node->left = cond;
+    node->right = stmts;
     return node;
 }
 
@@ -565,6 +574,9 @@ void printAST(ASTNode* node, int indentLevel) {
             break;
         case NODE_TYPE_IF:
             printf("DEBUG: Node type: If\n");
+            break;
+        case NODE_TYPE_WHILE:
+            printf("DEBUG: Node type: While\n");
             break;
         case NODE_TYPE_RETURN:
             printf("DEBUG: Node type: Return\n");
