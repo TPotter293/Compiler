@@ -1,4 +1,5 @@
 %{
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -564,6 +565,9 @@ void executeMain(ASTNode* root) {
 
 
 int main(int argc, char** argv) {
+
+    clock_t start_time = clock();
+
     if (argc > 1) {
         if (!(yyin = fopen(argv[1], "r"))) {
             perror(argv[1]);
@@ -609,5 +613,11 @@ int main(int argc, char** argv) {
     // Print or traverse the AST here if needed
     clean_up_symbol_table();
     freeASTNode(root);
+
+    clock_t end_time = clock();
+    double time_elapsed = (double) (end_time - start_time) / CLOCKS_PER_SEC;
+    printf("\n\nCompilation time: %f seconds\n", time_elapsed);
+
+
     return 0;
 }

@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <stdio.h> // Include for debugging output
 
-#define MAX_VARIABLES 100
+#define MAX_VARIABLES 500
 #define MAX_TAC_INSTRUCTIONS 1000
 
 struct {
@@ -25,7 +25,7 @@ void generateCode(const char* tac_filename, FILE* output_file) {
     fprintf(output_file, "main:\n");
 
     // Add this line to initialize stack pointer
-    fprintf(output_file, "addi $sp, $sp, -100\n");  // Allocate stack space
+    fprintf(output_file, "addi $sp, $sp, -500\n");  // Allocate stack space
 
     printf("Generating code from TAC file: %s\n", tac_filename);
     readTACFile(tac_filename);
@@ -120,6 +120,8 @@ void generateTACCode(FILE* output_file) {
             } else if (strcmp(instr->op, "+") == 0 || strcmp(instr->op, "-") == 0 ||
                         strcmp(instr->op, "*") == 0|| strcmp(instr->op, "/") == 0) {
                 generateBinaryOpCode(instr, output_file);
+            } else if (instr->op[0] == '\0') {
+                generateAssignmentCode(instr, output_file);
             } else {
                 fprintf(stderr, "Unsupported operator: %s\n", instr->op);
                 exit(1);

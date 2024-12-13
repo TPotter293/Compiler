@@ -1,25 +1,153 @@
-int x;
-int y;
+int globalInt;    
+char globalChar;   
+float globalFloat; 
+int boolFlag;      
 
-x = 5;
-y = 10;
+function int computeSum(int a, int b) {
+    int sum;
+    int doubleSum;
+    int temp;
 
-if (x != y) {
-    write 0;
+    sum = a + b; 
+    temp = sum + 5;  
+    doubleSum = temp * 2;  
+    globalFloat = globalFloat + sum;  
 
-    if (x > y) {
+    if (doubleSum > 50) {
+        globalInt = globalInt + 10;  
+        write 0;
+    } else {
+        globalInt = globalInt - 5;  
         write 1;
     }
-    else {
-        write 10;
+
+    write doubleSum; 
+    return doubleSum;
+}
+
+function void displayResult(int result) {
+    int localCopy;
+
+    localCopy = result;
+    localCopy = localCopy + 1;
+
+    if (localCopy / 2 == 0) {
+        globalChar = 'E';  
+    } else {
+        globalChar = 'O';  
     }
-    if (x < y) {
-        write 2;
+
+    write globalChar;
+    globalInt = localCopy;
+
+    localCopy = localCopy * 3;
+    write localCopy; 
+}
+
+function int multiply(int x, int y) {
+    int product;
+    int square;
+    int tempResult;
+
+    product = x * y;  
+    square = x * x;  
+    tempResult = product + square;  
+
+    if (tempResult > 50) {
+        globalFloat = globalFloat / 2.0;  
+        write globalFloat;
     }
-    else {
-        write 20;
+
+    write tempResult;
+    return tempResult;
+}
+
+function int factorial(int n) {
+    int result;
+
+    if (n < 1) {
+        write 1;  
+        return 1;
+    } else {
+        result = n * factorial(n - 1);  
+        write result; 
+        return result;
     }
 }
-else {
-    write 100;
+
+function int isPrime(int n) {
+    int i;
+
+    if (n < 1) {
+        return 0; 
+    }
+
+    i = 2;
+    while (i < n) {
+        if (n / i == 0) {
+            write N;  
+            return 0;  
+        }
+        i = i + 1;
+    }
+
+    write P;  
+    return 1;  
+}
+
+function void main() {
+    int localInt;     
+    float localFloat; 
+    int i;            
+    int result;       
+    int temp;         
+
+    localInt = 15;
+    localFloat = 3.7;
+    globalInt = 20;
+    globalChar = 'C';
+
+    write globalInt;
+    write globalChar;
+    write globalFloat;
+
+    result = localInt * 2 + 3 / 5 - 2 + globalInt;
+
+    if (result > 10) {
+        temp = result * 2;  
+        result = displayResult(temp);
+    } else {
+        temp = result - 1;
+        result = displayResult(temp + 3);
+    }
+
+    i = 0;
+    while (i < 10) {
+        result = multiply(i, i + 1);  
+
+        if (result > 20) {
+            globalInt = result;  
+        } else {
+            globalInt = globalInt + 1;  
+        }
+
+        write i; 
+        i = i + 1;
+    }
+
+    result = factorial(5);
+    write result; 
+
+    if (isPrime(result)) {
+        result = displayResult(result);
+    } else {
+        result = displayResult(result - 10);
+    }
+
+    temp = 5 * 4; 
+    result = temp + 10;
+    write result; 
+
+    result = computeSum(localInt, 20);
+    result = displayResult(result);
 }
